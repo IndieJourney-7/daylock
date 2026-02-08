@@ -75,9 +75,6 @@ export function AuthProvider({ children }) {
         setLoading(false)
       }
     }, 5000)
-        }
-      }
-    )
 
     return () => {
       isMounted = false
