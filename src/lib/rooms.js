@@ -35,7 +35,25 @@ export const roomsService = {
     console.log('Supabase response - data:', data, 'error:', error)
     
     if (error) throw error
-    return data
+    
+    // Transform room_invites into convenient properties
+    return (data || []).map(this._transformRoom)
+  },
+
+  /**
+   * Transform room data to add pending_invite, admin_id, admin from invites
+   */
+  _transformRoom(room) {
+    const invites = room.room_invites || []
+    const acceptedInvite = invites.find(i => i.status === 'accepted')
+    const pendingInvite = invites.find(i => i.status === 'pending')
+    
+    return {
+      ...room,
+      admin_id: acceptedInvite?.admin_id || null,
+      admin: acceptedInvite?.admin || null,
+      pending_invite: pendingInvite || null
+    }
   },
 
   /**
@@ -63,7 +81,7 @@ export const roomsService = {
       .single()
     
     if (error) throw error
-    return data
+    return this._transformRoom(data)
   },
 
   /**
@@ -129,6 +147,18 @@ export const roomsService = {
   async getRoomWithStats(roomId, userId) {
     // Get room
     const room = await this.getRoom(roomId)
+    
+    // If no userId, return room without attendance stats
+    if (!userId) {
+      return {
+        ...room,
+        stats: { approvedDays: 0, totalDays: 0, attendanceRate: 0, streak: 0 },
+        todayStatus: null,
+        todayProofNote: null,
+        rejectionReason: null,
+        attendance: []
+      }
+    }
     
     // Get attendance stats
     const { data: attendance, error } = await supabase

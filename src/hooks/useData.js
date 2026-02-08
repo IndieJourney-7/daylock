@@ -79,10 +79,10 @@ export function useRooms(userId) {
 /**
  * Fetch single room with stats
  */
-export function useRoom(roomId) {
+export function useRoom(roomId, userId) {
   return useFetch(
-    () => roomId ? roomsService.getRoomWithStats(roomId) : Promise.resolve(null),
-    [roomId]
+    () => roomId ? roomsService.getRoomWithStats(roomId, userId) : Promise.resolve(null),
+    [roomId, userId]
   )
 }
 

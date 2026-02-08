@@ -96,6 +96,8 @@ export const attendanceService = {
    * Get user's attendance for a specific room
    */
   async getUserAttendance(roomId, userId) {
+    if (!roomId || !userId) return []
+    
     const { data, error } = await supabase
       .from('attendance')
       .select('*')

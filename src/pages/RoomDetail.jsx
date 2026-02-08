@@ -56,7 +56,7 @@ function RoomDetail() {
   const { roomId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { data: room, loading, error } = useRoom(roomId)
+  const { data: room, loading, error } = useRoom(roomId, user?.id)
   const { data: attendanceData } = useAttendance(roomId, user?.id)
   const fileInputRef = useRef(null)
   
