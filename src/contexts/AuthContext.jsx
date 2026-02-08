@@ -19,14 +19,17 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let isMounted = true
 
+    console.log('AuthContext: Initializing auth listener')
+
     // Listen for auth changes - this is the PRIMARY auth mechanism
     // onAuthStateChange fires INITIAL_SESSION immediately with cached session
     const { data: { subscription } } = authService.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return
-        console.log('Auth event:', event, 'user:', session?.user?.id || 'none')
+        console.log('AuthContext: Auth event:', event, 'user:', session?.user?.id || 'none', 'loading:', loading)
         
         if (event === 'SIGNED_OUT') {
+          console.log('AuthContext: User signed out, clearing state')
           setUser(null)
           setProfile(null)
           setLoading(false)
@@ -36,10 +39,12 @@ export function AuthProvider({ children }) {
         
         if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           if (session?.user) {
+            console.log('AuthContext: Setting user from session:', session.user.id)
             setUser(session.user)
             
             // Mark init complete - user is authenticated
             if (!initCompleted.current) {
+              console.log('AuthContext: Init completed, setting loading=false')
               initCompleted.current = true
               setLoading(false)
             }
@@ -47,18 +52,20 @@ export function AuthProvider({ children }) {
             // Load profile in background
             try {
               const userProfile = await authService.ensureProfile(session.user)
-              console.log('Profile loaded:', userProfile?.name)
+              console.log('AuthContext: Profile loaded:', userProfile?.name)
               if (isMounted) setProfile(userProfile)
             } catch (err) {
               const isAbort = err?.name === 'AbortError' || 
                              err?.message?.includes('aborted')
               if (!isAbort) {
-                console.error('Profile fetch error:', err)
+                console.error('AuthContext: Profile fetch error:', err)
               }
             }
           } else if (event === 'INITIAL_SESSION') {
             // No session on init - user is not logged in
+            console.log('AuthContext: No session on INITIAL_SESSION event')
             if (!initCompleted.current) {
+              console.log('AuthContext: Init completed (no session), setting loading=false')
               initCompleted.current = true
               setLoading(false)
             }

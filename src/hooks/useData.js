@@ -57,13 +57,14 @@ export function useRooms(userId) {
     setError(null)
     
     try {
-      console.log('Fetching rooms for user:', userId)
+      console.log('useRooms: Fetching rooms for user:', userId)
       const result = await roomsService.getUserRooms(userId)
-      console.log('Rooms fetched:', result)
+      console.log('useRooms: Rooms fetched successfully:', result?.length, 'rooms')
       setData(result)
     } catch (err) {
-      console.error('Failed to fetch rooms:', err)
+      console.error('useRooms: Failed to fetch rooms:', err)
       setError(err.message)
+      setData([])
     } finally {
       setLoading(false)
     }

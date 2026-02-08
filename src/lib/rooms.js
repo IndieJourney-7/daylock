@@ -37,23 +37,18 @@ export const roomsService = {
     if (error) throw error
     
     // Transform room_invites into convenient properties
-    return (data || []).map(this._transformRoom)
-  },
-
-  /**
-   * Transform room data to add pending_invite, admin_id, admin from invites
-   */
-  _transformRoom(room) {
-    const invites = room.room_invites || []
-    const acceptedInvite = invites.find(i => i.status === 'accepted')
-    const pendingInvite = invites.find(i => i.status === 'pending')
-    
-    return {
-      ...room,
-      admin_id: acceptedInvite?.admin_id || null,
-      admin: acceptedInvite?.admin || null,
-      pending_invite: pendingInvite || null
-    }
+    return (data || []).map(room => {
+      const invites = room.room_invites || []
+      const acceptedInvite = invites.find(i => i.status === 'accepted')
+      const pendingInvite = invites.find(i => i.status === 'pending')
+      
+      return {
+        ...room,
+        admin_id: acceptedInvite?.admin_id || null,
+        admin: acceptedInvite?.admin || null,
+        pending_invite: pendingInvite || null
+      }
+    })
   },
 
   /**
@@ -81,7 +76,18 @@ export const roomsService = {
       .single()
     
     if (error) throw error
-    return this._transformRoom(data)
+    
+    // Transform room data
+    const invites = data.room_invites || []
+    const acceptedInvite = invites.find(i => i.status === 'accepted')
+    const pendingInvite = invites.find(i => i.status === 'pending')
+    
+    return {
+      ...data,
+      admin_id: acceptedInvite?.admin_id || null,
+      admin: acceptedInvite?.admin || null,
+      pending_invite: pendingInvite || null
+    }
   },
 
   /**

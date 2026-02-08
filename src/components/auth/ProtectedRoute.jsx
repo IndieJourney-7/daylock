@@ -10,8 +10,11 @@ export function ProtectedRoute({ children, requireAdmin = false }) {
   const { user, loading } = useAuth()
   const location = useLocation()
   
+  console.log('ProtectedRoute:', location.pathname, '- loading:', loading, 'user:', user?.id)
+  
   // Show loading only during initial auth check
   if (loading) {
+    console.log('ProtectedRoute: Showing loading spinner')
     return (
       <div className="min-h-screen bg-charcoal-900 flex items-center justify-center">
         <div className="text-center">
@@ -24,6 +27,7 @@ export function ProtectedRoute({ children, requireAdmin = false }) {
   
   // Not logged in - redirect to login
   if (!user) {
+    console.log('ProtectedRoute: No user, redirecting to /login')
     // Save the attempted location for redirect after login
     localStorage.setItem('auth_redirect', location.pathname)
     return <Navigate to="/login" replace />
@@ -31,9 +35,11 @@ export function ProtectedRoute({ children, requireAdmin = false }) {
   
   // User must have valid id and email
   if (!user.id || !user.email) {
+    console.log('ProtectedRoute: User missing id/email, redirecting to /login')
     return <Navigate to="/login" replace />
   }
   
+  console.log('ProtectedRoute: Rendering protected content')
   return children
 }
 
