@@ -1,0 +1,11 @@
+/**
+ * Lib barrel export
+ * All services and utilities
+ */
+
+export { supabase } from './supabase'
+export { authService } from './auth'
+export { roomsService } from './rooms'
+export { invitesService } from './invites'
+export { attendanceService } from './attendance'
+export { rulesService } from './rules'
