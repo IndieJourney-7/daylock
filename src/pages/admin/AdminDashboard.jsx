@@ -4,11 +4,12 @@
  * Admin approves proof of work uploaded by users
  */
 
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Card, Badge, Icon, Button } from '../../components/ui'
 import { useAuth } from '../../contexts'
 import { useAdminRooms, useAllPendingProofs } from '../../hooks'
-import { roomsService } from '../../lib'
+import { roomsService, invitesService } from '../../lib'
 
 // Get status styling
 const getStatusConfig = (todayProof) => {
@@ -49,15 +50,71 @@ function DashboardSkeleton() {
 }
 
 function AdminDashboard() {
+  const navigate = useNavigate()
   const { user, profile } = useAuth()
-  const { data: rooms, loading: roomsLoading } = useAdminRooms(user?.id)
+  const { data: rooms, loading: roomsLoading, refetch: refetchRooms } = useAdminRooms(user?.id)
   const { proofs, loading: proofsLoading } = useAllPendingProofs(user?.id)
+  
+  // Invite code state
+  const [inviteCode, setInviteCode] = useState('')
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [inviteError, setInviteError] = useState(null)
+  const [inviteSuccess, setInviteSuccess] = useState(null)
   
   const today = new Date().toLocaleDateString('en-US', { 
     weekday: 'long', 
     month: 'long', 
     day: 'numeric' 
   })
+  
+  // Handle invite code submission
+  const handleAcceptInvite = async () => {
+    if (!inviteCode.trim() || !user) return
+    
+    setIsVerifying(true)
+    setInviteError(null)
+    setInviteSuccess(null)
+    
+    try {
+      // First verify the code
+      const invite = await invitesService.getInviteByCode(inviteCode.trim())
+      
+      if (!invite) {
+        setInviteError('Invalid invite code. Please check and try again.')
+        return
+      }
+      
+      if (invite.status === 'accepted') {
+        setInviteError('This invite has already been used.')
+        return
+      }
+      
+      if (invite.status === 'revoked') {
+        setInviteError('This invite has been revoked.')
+        return
+      }
+      
+      // Accept the invite
+      await invitesService.acceptInvite(invite.invite_code, user.id)
+      
+      setInviteSuccess(`You are now managing "${invite.room?.name || 'the room'}"!`)
+      setInviteCode('')
+      
+      // Refetch rooms to show the new room
+      if (refetchRooms) {
+        await refetchRooms()
+      }
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setInviteSuccess(null), 3000)
+      
+    } catch (err) {
+      console.error('Accept invite error:', err)
+      setInviteError(err.message || 'Failed to accept invite')
+    } finally {
+      setIsVerifying(false)
+    }
+  }
   
   if (roomsLoading || proofsLoading) {
     return <DashboardSkeleton />
@@ -85,21 +142,11 @@ function AdminDashboard() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-white">
-            Welcome, {profile?.name?.split(' ')[0] || user?.user_metadata?.name?.split(' ')[0] || 'Admin'}
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">{today}</p>
-        </div>
-        <Link to="/admin/join">
-          <Button variant="secondary" size="sm">
-            <span className="flex items-center gap-2">
-              <Icon name="plus" className="w-4 h-4" />
-              Accept Invite
-            </span>
-          </Button>
-        </Link>
+      <div>
+        <h1 className="text-xl md:text-2xl font-bold text-white">
+          Welcome, {profile?.name?.split(' ')[0] || user?.user_metadata?.name?.split(' ')[0] || 'Admin'}
+        </h1>
+        <p className="text-gray-500 text-sm mt-1">{today}</p>
       </div>
       
       {/* Admin Profile Card */}
@@ -119,6 +166,62 @@ function AdminDashboard() {
             </Link>
           </div>
         </div>
+      </Card>
+      
+      {/* Accept Invite Code - Inline Form */}
+      <Card>
+        <div className="flex items-center gap-2 mb-3">
+          <Icon name="plus" className="w-4 h-4 text-accent" />
+          <h3 className="text-white font-medium">Accept Invite Code</h3>
+        </div>
+        
+        {/* Success message */}
+        {inviteSuccess && (
+          <div className="mb-3 p-3 bg-accent/20 border border-accent/30 rounded-lg">
+            <p className="text-accent text-sm text-center flex items-center justify-center gap-2">
+              <Icon name="check" className="w-4 h-4" />
+              {inviteSuccess}
+            </p>
+          </div>
+        )}
+        
+        {/* Error message */}
+        {inviteError && (
+          <div className="mb-3 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
+            <p className="text-red-400 text-sm text-center flex items-center justify-center gap-2">
+              <Icon name="close" className="w-4 h-4" />
+              {inviteError}
+            </p>
+          </div>
+        )}
+        
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={inviteCode}
+            onChange={(e) => {
+              setInviteCode(e.target.value.toUpperCase())
+              setInviteError(null)
+            }}
+            placeholder="Enter code (e.g., GYM-X4K9)"
+            className="flex-1 bg-charcoal-500/30 border border-charcoal-400/20 rounded-lg px-4 py-3 text-white font-mono tracking-wider placeholder-gray-600 focus:outline-none focus:border-accent/50 transition-colors"
+            onKeyDown={(e) => e.key === 'Enter' && handleAcceptInvite()}
+          />
+          <Button 
+            disabled={!inviteCode.trim() || isVerifying}
+            onClick={handleAcceptInvite}
+            className="px-6"
+          >
+            {isVerifying ? (
+              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              'Join'
+            )}
+          </Button>
+        </div>
+        <p className="text-gray-600 text-xs mt-2">
+          Paste the invite code shared by a user to manage their room
+        </p>
       </Card>
       
       {/* Quick Stats */}
@@ -283,17 +386,9 @@ function AdminDashboard() {
             <Icon name="rooms" className="w-8 h-8 text-gray-500" />
           </div>
           <h3 className="text-white font-medium mb-2">No rooms assigned yet</h3>
-          <p className="text-gray-500 text-sm mb-4">
-            Ask users to share their room invite code with you
+          <p className="text-gray-500 text-sm">
+            Paste an invite code above to start managing a user's room
           </p>
-          <Link to="/admin/join">
-            <Button>
-              <span className="flex items-center gap-2">
-                <Icon name="plus" className="w-4 h-4" />
-                Enter Invite Code
-              </span>
-            </Button>
-          </Link>
         </Card>
       )}
       
