@@ -18,74 +18,9 @@ export function AuthProvider({ children }) {
   // Initialize auth state
   useEffect(() => {
     let isMounted = true
-    
-    // Get initial session
-    const initAuth = async () => {
-      try {
-        // Wait a tick for Supabase to process URL hash if present
-        if (window.location.hash?.includes('access_token')) {
-          console.log('OAuth callback detected, waiting for session...')
-          await new Promise(resolve => setTimeout(resolve, 100))
-        }
-        
-        const session = await authService.getSession()
-        console.log('Initial session:', session?.user?.id || 'none')
-        if (!isMounted) return
-        
-        if (session?.user) {
-          setUser(session.user)
-          // Set loading false immediately - profile loads in background
-          if (!initCompleted.current) {
-            initCompleted.current = true
-            setLoading(false)
-          }
-          
-          // Load profile in background
-          try {
-            const userProfile = await authService.ensureProfile(session.user)
-            if (isMounted) setProfile(userProfile)
-          } catch (profileErr) {
-            const isAbort = profileErr?.name === 'AbortError' || 
-                           profileErr?.message?.includes('aborted')
-            if (!isAbort) {
-              console.error('Profile fetch error:', profileErr)
-            }
-          }
-        } else {
-          // No session - done loading
-          if (!initCompleted.current) {
-            initCompleted.current = true
-            setLoading(false)
-          }
-        }
-      } catch (err) {
-        const isAbort = err?.name === 'AbortError' || 
-                       err?.message?.includes('aborted')
-        if (isAbort) return
-        
-        console.error('Auth init error:', err)
-        if (isMounted) setError(err.message)
-        
-        // Still complete init on error
-        if (!initCompleted.current) {
-          initCompleted.current = true
-          setLoading(false)
-        }
-      }
-    }
 
-    // Timeout fallback - don't hang forever (reduced to 3s)
-    const timeout = setTimeout(() => {
-      if (isMounted && !initCompleted.current) {
-        console.warn('Auth init timeout - proceeding without session')
-        initCompleted.current = true
-        setLoading(false)
-      }
-    }, 3000)
-
-    initAuth()
-
-    // Listen for auth changes
+    // Listen for auth changes - this is the PRIMARY auth mechanism
+    // onAuthStateChange fires INITIAL_SESSION immediately with cached session
     const { data: { subscription } } = authService.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return
@@ -95,29 +30,51 @@ export function AuthProvider({ children }) {
           setUser(null)
           setProfile(null)
           setLoading(false)
+          initCompleted.current = true
           return
         }
         
-        if (session?.user) {
-          setUser(session.user)
-          setLoading(false) // User exists, stop loading
-          
-          // Load profile in background
-          try {
-            const userProfile = await authService.ensureProfile(session.user)
-            console.log('Profile loaded:', userProfile?.name)
-            if (isMounted) setProfile(userProfile)
-          } catch (err) {
-            const isAbort = err?.name === 'AbortError' || 
-                           err?.message?.includes('aborted')
-            if (!isAbort) {
-              console.error('Profile fetch error:', err)
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (session?.user) {
+            setUser(session.user)
+            
+            // Mark init complete - user is authenticated
+            if (!initCompleted.current) {
+              initCompleted.current = true
+              setLoading(false)
+            }
+            
+            // Load profile in background
+            try {
+              const userProfile = await authService.ensureProfile(session.user)
+              console.log('Profile loaded:', userProfile?.name)
+              if (isMounted) setProfile(userProfile)
+            } catch (err) {
+              const isAbort = err?.name === 'AbortError' || 
+                             err?.message?.includes('aborted')
+              if (!isAbort) {
+                console.error('Profile fetch error:', err)
+              }
+            }
+          } else if (event === 'INITIAL_SESSION') {
+            // No session on init - user is not logged in
+            if (!initCompleted.current) {
+              initCompleted.current = true
+              setLoading(false)
             }
           }
-        } else {
-          setUser(null)
-          setProfile(null)
-          setLoading(false)
+        }
+      }
+    )
+
+    // Timeout fallback - if onAuthStateChange never fires (shouldn't happen)
+    const timeout = setTimeout(() => {
+      if (isMounted && !initCompleted.current) {
+        console.warn('Auth init timeout - proceeding without session')
+        initCompleted.current = true
+        setLoading(false)
+      }
+    }, 5000)
         }
       }
     )
