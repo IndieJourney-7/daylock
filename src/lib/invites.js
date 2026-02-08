@@ -79,7 +79,7 @@ export const invitesService = {
         )
       `)
       .eq('invite_code', code.toUpperCase())
-      .single()
+      .maybeSingle()
     
     if (error) throw error
     return data

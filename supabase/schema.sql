@@ -141,6 +141,11 @@ CREATE POLICY "Users can view own rooms" ON rooms
       AND room_invites.admin_id = auth.uid() 
       AND room_invites.status = 'accepted'
     )
+    OR EXISTS (
+      SELECT 1 FROM room_invites
+      WHERE room_invites.room_id = rooms.id
+      AND room_invites.status = 'pending'
+    )
   );
 
 CREATE POLICY "Users can create rooms" ON rooms
