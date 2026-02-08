@@ -6,120 +6,87 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Badge, Icon, Button } from '../../components/ui'
-
-// Rooms assigned to admin by users via invite code
-const rooms = [
-  {
-    id: 'room_1',
-    name: 'Gym',
-    emoji: '🏋️',
-    timeWindow: '6:00 AM - 7:00 AM',
-    status: 'open',
-    assignedBy: { name: 'John Doe', email: 'john@email.com' },
-    inviteCode: 'GYM-X4K9',
-    todayStatus: 'pending_proof', // pending_proof, approved, missed, waiting
-    pendingProofs: 1,
-    streak: 12,
-    attendanceRate: 92,
-    totalDays: 45,
-    approvedDays: 41,
-    rules: 3
-  },
-  {
-    id: 'room_2',
-    name: 'Morning Run',
-    emoji: '🏃',
-    timeWindow: '5:30 AM - 6:30 AM',
-    status: 'locked',
-    assignedBy: { name: 'Jane Smith', email: 'jane@email.com' },
-    inviteCode: 'RUN-M2P8',
-    todayStatus: 'approved',
-    pendingProofs: 0,
-    streak: 5,
-    attendanceRate: 78,
-    totalDays: 30,
-    approvedDays: 23,
-    rules: 2
-  },
-  {
-    id: 'room_3',
-    name: 'Workout',
-    emoji: '💪',
-    timeWindow: '7:00 PM - 8:00 PM',
-    status: 'locked',
-    assignedBy: { name: 'John Doe', email: 'john@email.com' },
-    inviteCode: 'WRK-9Z2M',
-    todayStatus: 'missed',
-    pendingProofs: 0,
-    streak: 0,
-    attendanceRate: 65,
-    totalDays: 20,
-    approvedDays: 13,
-    rules: 1
-  },
-  {
-    id: 'room_4',
-    name: 'Study Session',
-    emoji: '📚',
-    timeWindow: '8:00 PM - 10:00 PM',
-    status: 'locked',
-    assignedBy: { name: 'Alex Johnson', email: 'alex@email.com' },
-    inviteCode: 'STD-K5P2',
-    todayStatus: 'pending_proof',
-    pendingProofs: 2,
-    streak: 8,
-    attendanceRate: 88,
-    totalDays: 25,
-    approvedDays: 22,
-    rules: 2
-  },
-]
+import { useAuth } from '../../contexts'
+import { useAdminRooms } from '../../hooks'
+import { roomsService } from '../../lib'
 
 const FILTER_OPTIONS = [
   { value: 'all', label: 'All Rooms' },
   { value: 'pending_proofs', label: 'Pending Proofs' },
-  { value: 'approved', label: 'Approved Today' },
+  { value: 'high_performance', label: 'High Performance' },
   { value: 'needs_attention', label: 'At Risk' },
 ]
 
 // Get status styling
-const getStatusConfig = (status) => {
-  switch (status) {
+const getStatusConfig = (todayProof) => {
+  if (!todayProof) {
+    return { label: 'Waiting', color: 'text-blue-400', bg: 'bg-blue-500/20', icon: 'history' }
+  }
+  
+  switch (todayProof.status) {
     case 'approved':
       return { label: 'Approved', color: 'text-accent', bg: 'bg-accent/20', icon: 'check' }
-    case 'pending_proof':
+    case 'pending_review':
       return { label: 'To Review', color: 'text-yellow-400', bg: 'bg-yellow-500/20', icon: 'camera' }
-    case 'waiting':
-      return { label: 'Waiting', color: 'text-blue-400', bg: 'bg-blue-500/20', icon: 'history' }
-    case 'missed':
-      return { label: 'Missed', color: 'text-red-400', bg: 'bg-red-500/20', icon: 'close' }
+    case 'rejected':
+      return { label: 'Rejected', color: 'text-red-400', bg: 'bg-red-500/20', icon: 'close' }
     default:
-      return { label: 'Unknown', color: 'text-gray-400', bg: 'bg-gray-500/20', icon: 'lock' }
+      return { label: 'Waiting', color: 'text-blue-400', bg: 'bg-blue-500/20', icon: 'history' }
   }
 }
 
+// Loading skeleton
+function RoomsSkeleton() {
+  return (
+    <div className="max-w-4xl mx-auto space-y-6 animate-pulse">
+      <div className="h-8 w-48 bg-charcoal-600 rounded" />
+      <div className="flex gap-3">
+        <div className="h-10 flex-1 bg-charcoal-600 rounded-lg" />
+        <div className="h-10 w-32 bg-charcoal-600 rounded-lg" />
+      </div>
+      <div className="space-y-3">
+        {[1,2,3,4].map(i => (
+          <div key={i} className="h-24 bg-charcoal-600 rounded-xl" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function AdminRooms() {
+  const { user } = useAuth()
+  const { data: rooms, loading } = useAdminRooms(user?.id)
   const [filter, setFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   
+  if (loading) {
+    return <RoomsSkeleton />
+  }
+  
+  const allRooms = rooms || []
+  
   // Filter rooms
-  const filteredRooms = rooms.filter(room => {
+  const filteredRooms = allRooms.filter(room => {
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       const matchesName = room.name.toLowerCase().includes(query)
-      const matchesUser = room.assignedBy.name.toLowerCase().includes(query)
+      const matchesUser = room.user?.name?.toLowerCase().includes(query) || 
+                         room.user?.email?.toLowerCase().includes(query)
       if (!matchesName && !matchesUser) return false
     }
     
     // Status filter
+    const attendanceRate = room.stats?.attendanceRate || 0
+    const pendingCount = room.pending_proofs_count || 0
+    
     switch (filter) {
       case 'pending_proofs':
-        return room.pendingProofs > 0
-      case 'approved':
-        return room.todayStatus === 'approved'
+        return pendingCount > 0
+      case 'high_performance':
+        return attendanceRate >= 80
       case 'needs_attention':
-        return room.attendanceRate < 70 || room.streak === 0
+        return attendanceRate < 70 || (room.stats?.streak || 0) === 0
       default:
         return true
     }
@@ -132,7 +99,7 @@ function AdminRooms() {
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-white">My Rooms</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {rooms.length} rooms you manage
+            {allRooms.length} room{allRooms.length !== 1 ? 's' : ''} you manage
           </p>
         </div>
         <Link to="/admin/join">
@@ -148,181 +115,123 @@ function AdminRooms() {
       {/* Search & Filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         {/* Search */}
-        <div className="relative flex-1">
-          <Icon 
-            name="search" 
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" 
-          />
+        <div className="flex-1 relative">
+          <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
           <input
             type="text"
-            placeholder="Search rooms or users..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-charcoal-500/50 border border-charcoal-500
-                     text-white placeholder-gray-500 text-sm
-                     focus:outline-none focus:border-accent/50"
+            placeholder="Search rooms or users..."
+            className="w-full bg-charcoal-500/30 border border-charcoal-400/20 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-accent/50 transition-colors"
           />
         </div>
         
-        {/* Filter buttons */}
-        <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
+        {/* Filter dropdown */}
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="bg-charcoal-500/30 border border-charcoal-400/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-accent/50 transition-colors cursor-pointer"
+        >
           {FILTER_OPTIONS.map(option => (
-            <button
-              key={option.value}
-              onClick={() => setFilter(option.value)}
-              className={`
-                px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-all
-                ${filter === option.value
-                  ? 'bg-accent text-charcoal-900 font-medium'
-                  : 'bg-charcoal-500/50 text-gray-400 hover:bg-charcoal-500'
-                }
-              `}
-            >
+            <option key={option.value} value={option.value}>
               {option.label}
-            </button>
+            </option>
           ))}
-        </div>
+        </select>
       </div>
       
-      {/* Stats Summary */}
-      <div className="grid grid-cols-4 gap-3">
-        <Card className="text-center py-3">
-          <p className="text-white font-bold">{rooms.length}</p>
-          <p className="text-gray-500 text-xs">Total</p>
-        </Card>
-        <Card className="text-center py-3">
-          <p className="text-yellow-400 font-bold">
-            {rooms.reduce((acc, r) => acc + r.pendingProofs, 0)}
-          </p>
-          <p className="text-gray-500 text-xs">To Review</p>
-        </Card>
-        <Card className="text-center py-3">
-          <p className="text-accent font-bold">
-            {rooms.filter(r => r.todayStatus === 'approved').length}
-          </p>
-          <p className="text-gray-500 text-xs">Approved</p>
-        </Card>
-        <Card className="text-center py-3">
-          <p className="text-red-400 font-bold">
-            {rooms.filter(r => r.attendanceRate < 70).length}
-          </p>
-          <p className="text-gray-500 text-xs">At Risk</p>
-        </Card>
-      </div>
+      {/* Results count */}
+      {(searchQuery || filter !== 'all') && (
+        <p className="text-gray-500 text-sm">
+          Showing {filteredRooms.length} of {allRooms.length} rooms
+        </p>
+      )}
       
       {/* Rooms List */}
       <div className="space-y-3">
         {filteredRooms.map((room) => {
-          const statusConfig = getStatusConfig(room.todayStatus)
-          const isAtRisk = room.attendanceRate < 70 || room.streak === 0
+          const statusConfig = getStatusConfig(room.today_attendance)
+          const isOpen = roomsService.isRoomOpen(room)
+          const attendanceRate = room.stats?.attendanceRate || 0
+          const streak = room.stats?.streak || 0
+          const totalDays = room.stats?.totalDays || 0
+          const approvedDays = room.stats?.approvedDays || 0
+          const pendingCount = room.pending_proofs_count || 0
+          const rulesCount = room.room_rules?.length || 0
           
           return (
             <Link key={room.id} to={`/admin/rooms/${room.id}`} className="block group">
               <Card 
                 className={`
                   transition-all duration-300 group-hover:border-accent/30
-                  ${isAtRisk ? 'border-red-500/30' : ''}
+                  ${pendingCount > 0 ? 'border-yellow-500/20' : ''}
                 `}
-                padding="p-4"
+                padding="p-4 md:p-5"
               >
-                <div className="flex items-start justify-between gap-4">
+                {/* Main row */}
+                <div className="flex items-center justify-between mb-3">
                   {/* Left - Room info */}
-                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
                     <div className={`
-                      w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0
-                      ${room.status === 'open' ? 'bg-accent/20' : 'bg-charcoal-500/50'}
+                      w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center text-xl md:text-2xl flex-shrink-0
+                      ${isOpen ? 'bg-accent/20 border border-accent/30' : 'bg-charcoal-500/50'}
                     `}>
-                      {room.emoji}
+                      {isOpen ? room.emoji || '🚪' : <Icon name="lock" className="w-5 h-5 md:w-6 md:h-6 text-gray-500" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-white font-medium">{room.name}</h3>
-                        <Badge variant={room.status === 'open' ? 'open' : 'locked'} size="sm">
-                          {room.status}
-                        </Badge>
-                        {isAtRisk && (
-                          <Badge variant="danger" size="sm">
-                            At Risk
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-white font-medium truncate">{room.name}</h3>
+                        {pendingCount > 0 && (
+                          <Badge variant="warning" size="sm">
+                            {pendingCount}
                           </Badge>
                         )}
                       </div>
-                      <p className="text-gray-500 text-xs mt-0.5">{room.timeWindow}</p>
-                      
-                      {/* Assigned by info */}
-                      <div className="flex items-center gap-2 mt-2">
-                        <div className="w-5 h-5 rounded-full bg-charcoal-500 flex items-center justify-center">
-                          <span className="text-[10px] text-gray-400">
-                            {room.assignedBy.name.split(' ').map(n => n[0]).join('')}
-                          </span>
-                        </div>
-                        <span className="text-gray-400 text-sm">
-                          {room.assignedBy.name}
-                          {room.pendingProofs > 0 && (
-                            <span className="text-yellow-400 ml-2">
-                              ({room.pendingProofs} pending)
-                            </span>
-                          )}
-                        </span>
-                      </div>
+                      <p className="text-gray-500 text-xs md:text-sm">{room.time_start} - {room.time_end}</p>
+                      <p className="text-gray-600 text-xs mt-0.5">
+                        {room.user?.name || room.user?.email || 'User'} • {rulesCount} rule{rulesCount !== 1 ? 's' : ''}
+                      </p>
                     </div>
                   </div>
                   
-                  {/* Right - Stats */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {/* Today status */}
-                    <div className={`
-                      flex items-center gap-1.5 px-2 py-1 rounded-lg
-                      ${statusConfig.bg}
-                    `}>
-                      <Icon name={statusConfig.icon} className={`w-3 h-3 ${statusConfig.color}`} />
-                      <span className={`text-xs ${statusConfig.color} hidden sm:inline`}>
-                        {statusConfig.label}
-                      </span>
-                    </div>
-                    
-                    {/* Stats */}
-                    <div className="hidden sm:flex items-center gap-4">
-                      <div className="text-center">
-                        <p className="text-white font-bold text-sm">{room.streak}</p>
-                        <p className="text-gray-600 text-xs">streak</p>
-                      </div>
-                      <div className="text-center">
-                        <p className={`font-bold text-sm ${
-                          room.attendanceRate >= 80 ? 'text-accent' 
-                          : room.attendanceRate >= 60 ? 'text-yellow-400' 
-                          : 'text-red-400'
-                        }`}>
-                          {room.attendanceRate}%
-                        </p>
-                        <p className="text-gray-600 text-xs">rate</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-gray-400 font-bold text-sm">{room.rules}</p>
-                        <p className="text-gray-600 text-xs">rules</p>
-                      </div>
-                    </div>
-                    
-                    <Icon 
-                      name="chevronRight" 
-                      className="w-5 h-5 text-gray-500 group-hover:text-gray-300" 
-                    />
+                  {/* Right - Status */}
+                  <div className={`
+                    flex items-center gap-1.5 px-2 py-1 rounded-lg flex-shrink-0
+                    ${statusConfig.bg}
+                  `}>
+                    <Icon name={statusConfig.icon} className={`w-3 h-3 ${statusConfig.color}`} />
+                    <span className={`text-xs ${statusConfig.color}`}>{statusConfig.label}</span>
                   </div>
                 </div>
                 
-                {/* Mobile stats row */}
-                <div className="flex sm:hidden items-center gap-4 mt-3 pt-3 border-t border-charcoal-500">
-                  <div className="flex items-center gap-1">
-                    <Icon name="calendar" className="w-3 h-3 text-gray-500" />
-                    <span className="text-gray-400 text-xs">{room.streak} day streak</span>
+                {/* Stats row */}
+                <div className="flex items-center justify-between pt-3 border-t border-charcoal-400/10">
+                  <div className="flex items-center gap-4 md:gap-6">
+                    {/* Streak */}
+                    <div className="flex items-center gap-1.5">
+                      <Icon name="fire" className="w-3 h-3 text-gray-500" />
+                      <span className="text-white text-sm font-medium">{streak}</span>
+                      <span className="text-gray-600 text-xs">streak</span>
+                    </div>
+                    
+                    {/* Attendance */}
+                    <div className="flex items-center gap-1.5">
+                      <Icon name="calendar" className="w-3 h-3 text-gray-500" />
+                      <span className="text-white text-sm font-medium">{approvedDays}/{totalDays}</span>
+                      <span className="text-gray-600 text-xs">days</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span className={`text-xs ${
-                      room.attendanceRate >= 80 ? 'text-accent' 
-                      : room.attendanceRate >= 60 ? 'text-yellow-400' 
-                      : 'text-red-400'
+                  
+                  {/* Attendance rate */}
+                  <div className="flex items-center gap-2">
+                    <span className={`text-lg font-bold ${
+                      attendanceRate >= 80 ? 'text-accent' : 
+                      attendanceRate >= 60 ? 'text-yellow-400' : 
+                      'text-red-400'
                     }`}>
-                      {room.attendanceRate}% attendance
+                      {attendanceRate}%
                     </span>
+                    <Icon name="chevronRight" className="w-5 h-5 text-gray-500 group-hover:text-gray-300" />
                   </div>
                 </div>
               </Card>
@@ -331,18 +240,39 @@ function AdminRooms() {
         })}
       </div>
       
-      {/* Empty state */}
-      {filteredRooms.length === 0 && (
+      {/* Empty states */}
+      {filteredRooms.length === 0 && allRooms.length > 0 && (
+        <Card className="text-center py-12">
+          <Icon name="search" className="w-12 h-12 text-gray-500 mx-auto mb-3" />
+          <h3 className="text-white font-medium mb-2">No rooms found</h3>
+          <p className="text-gray-500 text-sm">Try adjusting your search or filter</p>
+          <Button 
+            variant="secondary" 
+            onClick={() => { setSearchQuery(''); setFilter('all') }}
+            className="mt-4"
+          >
+            Clear Filters
+          </Button>
+        </Card>
+      )}
+      
+      {allRooms.length === 0 && (
         <Card className="text-center py-12">
           <div className="w-16 h-16 rounded-full bg-charcoal-500/50 flex items-center justify-center mx-auto mb-4">
-            <Icon name="search" className="w-8 h-8 text-gray-500" />
+            <Icon name="rooms" className="w-8 h-8 text-gray-500" />
           </div>
-          <h3 className="text-white font-medium mb-2">No rooms found</h3>
-          <p className="text-gray-500 text-sm">
-            {searchQuery 
-              ? `No rooms matching "${searchQuery}"`
-              : 'Try changing your filter'}
+          <h3 className="text-white font-medium mb-2">No rooms assigned yet</h3>
+          <p className="text-gray-500 text-sm mb-4">
+            Ask users to share their room invite code with you
           </p>
+          <Link to="/admin/join">
+            <Button>
+              <span className="flex items-center gap-2">
+                <Icon name="plus" className="w-4 h-4" />
+                Enter Invite Code
+              </span>
+            </Button>
+          </Link>
         </Card>
       )}
     </div>
