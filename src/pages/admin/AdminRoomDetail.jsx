@@ -1,74 +1,15 @@
 /**
  * Admin Room Detail
  * Manage room rules, timings, and approve user's proof of work
+ * Connected to real database - no hardcoded data
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Card, Badge, Icon, Button } from '../../components/ui'
-
-// Mock room data assigned by user
-const roomData = {
-  id: 'room_1',
-  name: 'Gym',
-  emoji: '🏋️',
-  status: 'open',
-  assignedBy: { 
-    id: 'user_1',
-    name: 'John Doe', 
-    email: 'john@email.com', 
-    avatar: null
-  },
-  inviteCode: 'GYM-X4K9',
-  assignedAt: '2024-01-15',
-  timeWindow: {
-    start: '06:00',
-    end: '07:00'
-  },
-  rules: [
-    { id: 1, text: 'Must wear proper gym attire', enabled: true },
-    { id: 2, text: 'Minimum 30 minutes workout', enabled: true },
-    { id: 3, text: 'Photo proof must show equipment', enabled: false },
-  ],
-  stats: {
-    streak: 12,
-    longestStreak: 21,
-    attendanceRate: 92,
-    totalDays: 45,
-    approvedDays: 41,
-    rejectedDays: 2,
-    missedDays: 2
-  }
-}
-
-// Mock pending proofs to approve
-const pendingProofs = [
-  {
-    id: 'proof_1',
-    date: '2024-01-20',
-    uploadedAt: '2024-01-20T06:32:00',
-    imageUrl: '/proof1.jpg',
-    note: 'Morning leg workout completed!',
-    status: 'pending'
-  },
-  {
-    id: 'proof_2',
-    date: '2024-01-19',
-    uploadedAt: '2024-01-19T06:45:00',
-    imageUrl: '/proof2.jpg',
-    note: 'Cardio session done',
-    status: 'pending'
-  }
-]
-
-// Mock attendance history
-const attendanceHistory = [
-  { date: '2024-01-18', status: 'approved', proof: '/proof3.jpg', time: '6:15 AM' },
-  { date: '2024-01-17', status: 'approved', proof: '/proof4.jpg', time: '6:45 AM' },
-  { date: '2024-01-16', status: 'rejected', proof: '/proof5.jpg', time: '6:22 AM', reason: 'Proof unclear' },
-  { date: '2024-01-15', status: 'approved', proof: '/proof6.jpg', time: '6:55 AM' },
-  { date: '2024-01-14', status: 'missed', proof: null, time: null },
-]
+import { useAuth } from '../../contexts'
+import { useRoomRules, usePendingProofs } from '../../hooks'
+import { invitesService, roomsService, attendanceService } from '../../lib'
 
 const TABS = [
   { id: 'proofs', label: 'Proofs', icon: 'camera' },
@@ -76,55 +17,154 @@ const TABS = [
   { id: 'history', label: 'History', icon: 'calendar' },
 ]
 
+// Loading skeleton
+function DetailSkeleton() {
+  return (
+    <div className="max-w-4xl mx-auto space-y-6 animate-pulse">
+      <div className="flex items-center gap-4">
+        <div className="w-10 h-10 bg-charcoal-600 rounded-lg" />
+        <div className="flex-1">
+          <div className="h-6 w-32 bg-charcoal-600 rounded mb-2" />
+          <div className="h-4 w-24 bg-charcoal-600 rounded" />
+        </div>
+      </div>
+      <div className="h-20 bg-charcoal-600 rounded-xl" />
+      <div className="grid grid-cols-4 gap-2">
+        {[1,2,3,4].map(i => <div key={i} className="h-16 bg-charcoal-600 rounded-xl" />)}
+      </div>
+      <div className="h-64 bg-charcoal-600 rounded-xl" />
+    </div>
+  )
+}
+
 function AdminRoomDetail() {
   const { roomId } = useParams()
+  const { user } = useAuth()
+  
+  // State
+  const [room, setRoom] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('proofs')
-  const [rules, setRules] = useState(roomData.rules)
   const [newRule, setNewRule] = useState('')
-  const [timeWindow, setTimeWindow] = useState(roomData.timeWindow)
-  const [proofs, setProofs] = useState(pendingProofs)
+  const [timeWindow, setTimeWindow] = useState({ start: '06:00', end: '07:00' })
   const [isSaving, setIsSaving] = useState(false)
   const [selectedProof, setSelectedProof] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [attendanceHistory, setAttendanceHistory] = useState([])
   
-  // Toggle rule
-  const toggleRule = (ruleId) => {
-    setRules(rules.map(r => 
-      r.id === ruleId ? { ...r, enabled: !r.enabled } : r
-    ))
-  }
+  // Hooks for real data
+  const { rules, loading: rulesLoading, addRule: addRuleToDb, toggleRule: toggleRuleInDb, deleteRule: deleteRuleFromDb } = useRoomRules(roomId)
+  const { proofs, loading: proofsLoading, approve, reject, refetch: refetchProofs } = usePendingProofs(roomId)
+  
+  // Fetch room details
+  useEffect(() => {
+    async function fetchRoom() {
+      if (!user?.id || !roomId) return
+      
+      setLoading(true)
+      try {
+        // Get all admin rooms and find this one
+        const adminRooms = await invitesService.getAdminRooms(user.id)
+        const foundRoom = adminRooms.find(r => r.id === roomId)
+        
+        if (!foundRoom) {
+          setError('Room not found or you do not have access')
+          return
+        }
+        
+        // Get room stats
+        const stats = await roomsService.getRoomWithStats(roomId, foundRoom.user_id)
+        
+        setRoom({
+          ...foundRoom,
+          stats: stats?.stats || { streak: 0, attendanceRate: 0, approvedDays: 0, missedDays: 0 }
+        })
+        
+        setTimeWindow({
+          start: foundRoom.time_start || '06:00',
+          end: foundRoom.time_end || '07:00'
+        })
+        
+        // Fetch attendance history
+        const history = await attendanceService.getUserAttendance(roomId, foundRoom.user_id)
+        setAttendanceHistory(history || [])
+        
+      } catch (err) {
+        console.error('Failed to fetch room:', err)
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchRoom()
+  }, [user?.id, roomId])
   
   // Add new rule
-  const addRule = () => {
+  const handleAddRule = async () => {
     if (!newRule.trim()) return
-    const newId = Math.max(...rules.map(r => r.id), 0) + 1
-    setRules([...rules, { id: newId, text: newRule.trim(), enabled: true }])
-    setNewRule('')
+    try {
+      await addRuleToDb(newRule.trim())
+      setNewRule('')
+    } catch (err) {
+      console.error('Failed to add rule:', err)
+    }
+  }
+  
+  // Toggle rule
+  const handleToggleRule = async (ruleId) => {
+    try {
+      await toggleRuleInDb(ruleId)
+    } catch (err) {
+      console.error('Failed to toggle rule:', err)
+    }
   }
   
   // Delete rule
-  const deleteRule = (ruleId) => {
-    setRules(rules.filter(r => r.id !== ruleId))
+  const handleDeleteRule = async (ruleId) => {
+    try {
+      await deleteRuleFromDb(ruleId)
+    } catch (err) {
+      console.error('Failed to delete rule:', err)
+    }
   }
   
   // Approve proof
-  const approveProof = (proofId) => {
-    setProofs(proofs.filter(p => p.id !== proofId))
-    setSelectedProof(null)
+  const handleApprove = async (proofId) => {
+    try {
+      await approve(proofId)
+      setSelectedProof(null)
+    } catch (err) {
+      console.error('Failed to approve:', err)
+    }
   }
   
   // Reject proof
-  const rejectProof = (proofId) => {
-    setProofs(proofs.filter(p => p.id !== proofId))
-    setSelectedProof(null)
-    setRejectReason('')
+  const handleReject = async (proofId) => {
+    try {
+      await reject(proofId, rejectReason)
+      setSelectedProof(null)
+      setRejectReason('')
+    } catch (err) {
+      console.error('Failed to reject:', err)
+    }
   }
   
-  // Save changes
+  // Save time window
   const handleSave = async () => {
+    if (!room) return
     setIsSaving(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setIsSaving(false)
+    try {
+      await roomsService.updateRoom(roomId, {
+        time_start: timeWindow.start,
+        time_end: timeWindow.end
+      })
+    } catch (err) {
+      console.error('Failed to save:', err)
+    } finally {
+      setIsSaving(false)
+    }
   }
   
   // Format date
@@ -135,8 +175,43 @@ function AdminRoomDetail() {
   
   // Format time
   const formatTime = (dateStr) => {
+    if (!dateStr) return ''
     const date = new Date(dateStr)
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  }
+  
+  if (loading || rulesLoading) {
+    return <DetailSkeleton />
+  }
+  
+  if (error || !room) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <Card className="text-center py-12">
+          <Icon name="close" className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-white font-medium mb-2">Error</h2>
+          <p className="text-gray-500 text-sm mb-4">{error || 'Room not found'}</p>
+          <Link to="/admin/rooms">
+            <Button variant="secondary">Back to Rooms</Button>
+          </Link>
+        </Card>
+      </div>
+    )
+  }
+  
+  const isOpen = roomsService.isRoomOpen(room)
+  const userName = room.assignedBy?.name || room.user?.name || 'User'
+  const userEmail = room.assignedBy?.email || room.user?.email || ''
+  const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase()
+  
+  // Calculate stats from history
+  const stats = {
+    streak: room.stats?.streak || 0,
+    attendanceRate: room.stats?.attendanceRate || 0,
+    approvedDays: attendanceHistory.filter(a => a.status === 'approved').length,
+    rejectedDays: attendanceHistory.filter(a => a.status === 'rejected').length,
+    missedDays: attendanceHistory.filter(a => a.status === 'missed').length,
+    totalDays: attendanceHistory.length
   }
   
   return (
@@ -153,19 +228,19 @@ function AdminRoomDetail() {
           <div className="flex items-center gap-3">
             <div className={`
               w-14 h-14 rounded-xl flex items-center justify-center text-2xl
-              ${roomData.status === 'open' ? 'bg-accent/20' : 'bg-charcoal-500/50'}
+              ${isOpen ? 'bg-accent/20' : 'bg-charcoal-500/50'}
             `}>
-              {roomData.emoji}
+              {room.emoji || '🚪'}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-white">{roomData.name}</h1>
-                <Badge variant={roomData.status === 'open' ? 'open' : 'locked'}>
-                  {roomData.status}
+                <h1 className="text-xl font-bold text-white">{room.name}</h1>
+                <Badge variant={isOpen ? 'open' : 'locked'}>
+                  {isOpen ? 'open' : 'locked'}
                 </Badge>
               </div>
               <p className="text-gray-500 text-sm">
-                {roomData.timeWindow.start} - {roomData.timeWindow.end}
+                {room.time_start || timeWindow.start} - {room.time_end || timeWindow.end}
               </p>
             </div>
           </div>
@@ -178,23 +253,22 @@ function AdminRoomDetail() {
         )}
       </div>
       
-      {/* Assigned By Card */}
+      {/* Assigned By Card - Real User Data */}
       <Card padding="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-charcoal-500 flex items-center justify-center">
-              <span className="text-sm text-gray-400">
-                {roomData.assignedBy.name.split(' ').map(n => n[0]).join('')}
-              </span>
+              <span className="text-sm text-gray-400">{userInitials}</span>
             </div>
             <div>
               <p className="text-gray-400 text-xs">Assigned by</p>
-              <p className="text-white font-medium">{roomData.assignedBy.name}</p>
+              <p className="text-white font-medium">{userName}</p>
+              <p className="text-gray-500 text-xs">{userEmail}</p>
             </div>
           </div>
           <div className="text-right">
             <p className="text-gray-500 text-xs">Invite Code</p>
-            <p className="text-accent font-mono text-sm">{roomData.inviteCode}</p>
+            <p className="text-accent font-mono text-sm">{room.inviteCode || 'N/A'}</p>
           </div>
         </div>
       </Card>
@@ -202,19 +276,19 @@ function AdminRoomDetail() {
       {/* Quick Stats */}
       <div className="grid grid-cols-4 gap-2">
         <Card className="text-center py-3">
-          <p className="text-accent text-xl font-bold">{roomData.stats.streak}</p>
+          <p className="text-accent text-xl font-bold">{stats.streak}</p>
           <p className="text-gray-500 text-[10px]">Streak</p>
         </Card>
         <Card className="text-center py-3">
-          <p className="text-white text-xl font-bold">{roomData.stats.attendanceRate}%</p>
+          <p className="text-white text-xl font-bold">{stats.attendanceRate}%</p>
           <p className="text-gray-500 text-[10px]">Rate</p>
         </Card>
         <Card className="text-center py-3">
-          <p className="text-accent text-xl font-bold">{roomData.stats.approvedDays}</p>
+          <p className="text-accent text-xl font-bold">{stats.approvedDays}</p>
           <p className="text-gray-500 text-[10px]">Approved</p>
         </Card>
         <Card className="text-center py-3">
-          <p className="text-red-400 text-xl font-bold">{roomData.stats.missedDays}</p>
+          <p className="text-red-400 text-xl font-bold">{stats.missedDays}</p>
           <p className="text-gray-500 text-[10px]">Missed</p>
         </Card>
       </div>
@@ -251,7 +325,7 @@ function AdminRoomDetail() {
           {proofs.length > 0 ? (
             <>
               <p className="text-gray-400 text-sm">
-                Review proof uploads from {roomData.assignedBy.name}
+                Review proof uploads from {userName}
               </p>
               
               {proofs.map((proof) => (
@@ -262,20 +336,29 @@ function AdminRoomDetail() {
                       <div>
                         <p className="text-white font-medium">{formatDate(proof.date)}</p>
                         <p className="text-gray-500 text-xs">
-                          Uploaded at {formatTime(proof.uploadedAt)}
+                          Uploaded at {formatTime(proof.submitted_at)}
                         </p>
                       </div>
                       <Badge variant="warning">Pending Review</Badge>
                     </div>
                     
-                    {/* Proof Image Placeholder */}
-                    <div className="aspect-video rounded-lg bg-charcoal-500/50 flex items-center justify-center border border-charcoal-500">
-                      <div className="text-center">
-                        <Icon name="camera" className="w-12 h-12 text-gray-500 mx-auto mb-2" />
-                        <p className="text-gray-500 text-sm">Proof Image</p>
-                        <p className="text-gray-600 text-xs">{proof.imageUrl}</p>
+                    {/* Proof Image */}
+                    {proof.proof_url ? (
+                      <div className="aspect-video rounded-lg overflow-hidden bg-charcoal-500/50">
+                        <img 
+                          src={proof.proof_url} 
+                          alt="Proof" 
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                    </div>
+                    ) : (
+                      <div className="aspect-video rounded-lg bg-charcoal-500/50 flex items-center justify-center border border-charcoal-500">
+                        <div className="text-center">
+                          <Icon name="camera" className="w-12 h-12 text-gray-500 mx-auto mb-2" />
+                          <p className="text-gray-500 text-sm">No image available</p>
+                        </div>
+                      </div>
+                    )}
                     
                     {/* User Note */}
                     {proof.note && (
@@ -286,24 +369,26 @@ function AdminRoomDetail() {
                     )}
                     
                     {/* Active Rules */}
-                    <div className="p-3 rounded-lg bg-charcoal-500/20">
-                      <p className="text-gray-400 text-xs mb-2">Check against rules:</p>
-                      <div className="space-y-1">
-                        {rules.filter(r => r.enabled).map(rule => (
-                          <div key={rule.id} className="flex items-center gap-2">
-                            <div className="w-4 h-4 rounded border border-gray-500 flex items-center justify-center">
-                              <Icon name="check" className="w-2.5 h-2.5 text-gray-500" />
+                    {rules.filter(r => r.enabled).length > 0 && (
+                      <div className="p-3 rounded-lg bg-charcoal-500/20">
+                        <p className="text-gray-400 text-xs mb-2">Check against rules:</p>
+                        <div className="space-y-1">
+                          {rules.filter(r => r.enabled).map(rule => (
+                            <div key={rule.id} className="flex items-center gap-2">
+                              <div className="w-4 h-4 rounded border border-gray-500 flex items-center justify-center">
+                                <Icon name="check" className="w-2.5 h-2.5 text-gray-500" />
+                              </div>
+                              <span className="text-gray-400 text-xs">{rule.text}</span>
                             </div>
-                            <span className="text-gray-400 text-xs">{rule.text}</span>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     
                     {/* Action Buttons */}
                     <div className="flex gap-3">
                       <Button 
-                        onClick={() => approveProof(proof.id)}
+                        onClick={() => handleApprove(proof.id)}
                         className="flex-1"
                       >
                         <span className="flex items-center justify-center gap-2">
@@ -339,7 +424,7 @@ function AdminRoomDetail() {
                           <Button 
                             variant="danger" 
                             size="sm" 
-                            onClick={() => rejectProof(proof.id)}
+                            onClick={() => handleReject(proof.id)}
                             className="flex-1"
                           >
                             Confirm Reject
@@ -368,7 +453,7 @@ function AdminRoomDetail() {
               </div>
               <h3 className="text-white font-medium mb-2">All caught up!</h3>
               <p className="text-gray-500 text-sm">
-                No pending proofs to review
+                No pending proofs to review from {userName}
               </p>
             </Card>
           )}
@@ -382,7 +467,7 @@ function AdminRoomDetail() {
           <Card>
             <h3 className="text-white font-medium mb-4">Time Window</h3>
             <p className="text-gray-500 text-sm mb-4">
-              Set when {roomData.assignedBy.name.split(' ')[0]} can mark attendance
+              Set when {userName.split(' ')[0]} can mark attendance
             </p>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -412,7 +497,7 @@ function AdminRoomDetail() {
           <Card>
             <h3 className="text-white font-medium mb-2">Attendance Rules</h3>
             <p className="text-gray-500 text-sm mb-4">
-              Rules user must follow when uploading proof
+              Rules {userName.split(' ')[0]} must follow when uploading proof
             </p>
             
             <div className="space-y-3 mb-4">
@@ -428,7 +513,7 @@ function AdminRoomDetail() {
                   `}
                 >
                   <button
-                    onClick={() => toggleRule(rule.id)}
+                    onClick={() => handleToggleRule(rule.id)}
                     className={`
                       w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0
                       transition-all
@@ -446,7 +531,7 @@ function AdminRoomDetail() {
                     {rule.text}
                   </span>
                   <button
-                    onClick={() => deleteRule(rule.id)}
+                    onClick={() => handleDeleteRule(rule.id)}
                     className="p-1 rounded hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors"
                   >
                     <Icon name="close" className="w-4 h-4" />
@@ -456,7 +541,7 @@ function AdminRoomDetail() {
               
               {rules.length === 0 && (
                 <p className="text-gray-500 text-sm text-center py-4">
-                  No rules added yet
+                  No rules added yet. Add rules for {userName.split(' ')[0]} to follow.
                 </p>
               )}
             </div>
@@ -468,12 +553,12 @@ function AdminRoomDetail() {
                 placeholder="Add a new rule..."
                 value={newRule}
                 onChange={(e) => setNewRule(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && addRule()}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddRule()}
                 className="flex-1 px-4 py-2.5 rounded-lg bg-charcoal-500/50 border border-charcoal-500
                          text-white placeholder-gray-500 text-sm
                          focus:outline-none focus:border-accent/50"
               />
-              <Button onClick={addRule} size="sm" disabled={!newRule.trim()}>
+              <Button onClick={handleAddRule} size="sm" disabled={!newRule.trim()}>
                 Add
               </Button>
             </div>
@@ -494,89 +579,111 @@ function AdminRoomDetail() {
       {activeTab === 'history' && (
         <div className="space-y-4">
           <Card>
-            <h3 className="text-white font-medium mb-4">Attendance History</h3>
+            <h3 className="text-white font-medium mb-4">Attendance History for {userName}</h3>
             
-            <div className="space-y-2">
-              {attendanceHistory.map((entry, index) => (
-                <div 
-                  key={index}
-                  className={`
-                    flex items-center justify-between p-3 rounded-lg
-                    ${entry.status === 'approved' 
-                      ? 'bg-accent/10 border border-accent/20' 
-                      : entry.status === 'rejected'
-                      ? 'bg-yellow-500/10 border border-yellow-500/20'
-                      : 'bg-red-500/10 border border-red-500/20'
-                    }
-                  `}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`
-                      w-10 h-10 rounded-full flex items-center justify-center
-                      ${entry.status === 'approved' ? 'bg-accent/20' 
-                        : entry.status === 'rejected' ? 'bg-yellow-500/20'
-                        : 'bg-red-500/20'
+            {attendanceHistory.length > 0 ? (
+              <div className="space-y-2">
+                {attendanceHistory.slice(0, 20).map((entry) => (
+                  <div 
+                    key={entry.id}
+                    className={`
+                      flex items-center justify-between p-3 rounded-lg
+                      ${entry.status === 'approved' 
+                        ? 'bg-accent/10 border border-accent/20' 
+                        : entry.status === 'rejected'
+                        ? 'bg-yellow-500/10 border border-yellow-500/20'
+                        : entry.status === 'pending_review'
+                        ? 'bg-blue-500/10 border border-blue-500/20'
+                        : 'bg-red-500/10 border border-red-500/20'
                       }
-                    `}>
-                      <Icon 
-                        name={entry.status === 'approved' ? 'check' : entry.status === 'rejected' ? 'history' : 'close'}
-                        className={`w-5 h-5 ${
-                          entry.status === 'approved' ? 'text-accent' 
-                          : entry.status === 'rejected' ? 'text-yellow-400'
-                          : 'text-red-400'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <p className="text-white font-medium">{formatDate(entry.date)}</p>
-                      <p className="text-gray-500 text-xs">
-                        {entry.status === 'approved' 
-                          ? `Approved - ${entry.time}`
-                          : entry.status === 'rejected'
-                          ? `Rejected: ${entry.reason}`
-                          : 'No proof uploaded'
+                    `}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`
+                        w-10 h-10 rounded-full flex items-center justify-center
+                        ${entry.status === 'approved' ? 'bg-accent/20' 
+                          : entry.status === 'rejected' ? 'bg-yellow-500/20'
+                          : entry.status === 'pending_review' ? 'bg-blue-500/20'
+                          : 'bg-red-500/20'
                         }
-                      </p>
+                      `}>
+                        <Icon 
+                          name={entry.status === 'approved' ? 'check' 
+                            : entry.status === 'rejected' ? 'close' 
+                            : entry.status === 'pending_review' ? 'history'
+                            : 'close'}
+                          className={`w-5 h-5 ${
+                            entry.status === 'approved' ? 'text-accent' 
+                            : entry.status === 'rejected' ? 'text-yellow-400'
+                            : entry.status === 'pending_review' ? 'text-blue-400'
+                            : 'text-red-400'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">{formatDate(entry.date)}</p>
+                        <p className="text-gray-500 text-xs">
+                          {entry.status === 'approved' 
+                            ? `Approved${entry.submitted_at ? ` - ${formatTime(entry.submitted_at)}` : ''}`
+                            : entry.status === 'rejected'
+                            ? `Rejected${entry.rejection_reason ? `: ${entry.rejection_reason}` : ''}`
+                            : entry.status === 'pending_review'
+                            ? 'Waiting for review'
+                            : 'No proof uploaded'
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      {entry.proof_url && (
+                        <a 
+                          href={entry.proof_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="p-2 rounded-lg bg-charcoal-500/50 hover:bg-charcoal-500 transition-colors"
+                        >
+                          <Icon name="camera" className="w-4 h-4 text-gray-400" />
+                        </a>
+                      )}
+                      <Badge variant={
+                        entry.status === 'approved' ? 'success' 
+                        : entry.status === 'rejected' ? 'warning' 
+                        : entry.status === 'pending_review' ? 'info'
+                        : 'danger'
+                      }>
+                        {entry.status === 'approved' ? 'Approved' 
+                         : entry.status === 'rejected' ? 'Rejected' 
+                         : entry.status === 'pending_review' ? 'Pending'
+                         : 'Missed'}
+                      </Badge>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {entry.proof && (
-                      <button className="p-2 rounded-lg bg-charcoal-500/50 hover:bg-charcoal-500 transition-colors">
-                        <Icon name="camera" className="w-4 h-4 text-gray-400" />
-                      </button>
-                    )}
-                    <Badge variant={
-                      entry.status === 'approved' ? 'success' 
-                      : entry.status === 'rejected' ? 'warning' 
-                      : 'danger'
-                    }>
-                      {entry.status === 'approved' ? 'Approved' 
-                       : entry.status === 'rejected' ? 'Rejected' 
-                       : 'Missed'}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm text-center py-8">
+                No attendance history yet for {userName}
+              </p>
+            )}
           </Card>
           
           {/* Stats */}
           <div className="grid grid-cols-4 gap-2">
             <Card className="text-center py-3">
-              <p className="text-white font-bold">{roomData.stats.totalDays}</p>
+              <p className="text-white font-bold">{stats.totalDays}</p>
               <p className="text-gray-500 text-xs">Total</p>
             </Card>
             <Card className="text-center py-3">
-              <p className="text-accent font-bold">{roomData.stats.approvedDays}</p>
+              <p className="text-accent font-bold">{stats.approvedDays}</p>
               <p className="text-gray-500 text-xs">Approved</p>
             </Card>
             <Card className="text-center py-3">
-              <p className="text-yellow-400 font-bold">{roomData.stats.rejectedDays}</p>
+              <p className="text-yellow-400 font-bold">{stats.rejectedDays}</p>
               <p className="text-gray-500 text-xs">Rejected</p>
             </Card>
             <Card className="text-center py-3">
-              <p className="text-red-400 font-bold">{roomData.stats.missedDays}</p>
+              <p className="text-red-400 font-bold">{stats.missedDays}</p>
               <p className="text-gray-500 text-xs">Missed</p>
             </Card>
           </div>
