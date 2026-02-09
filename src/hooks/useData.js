@@ -1,5 +1,6 @@
 /**
  * Custom hooks for data fetching
+ * All API calls are authenticated via JWT - no need to pass userId
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -11,12 +12,17 @@ import {
 } from '../lib'
 
 // Generic fetch hook
-function useFetch(fetchFn, deps = []) {
+function useFetch(fetchFn, deps = [], shouldFetch = true) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const refetch = useCallback(async () => {
+    if (!shouldFetch) {
+      setLoading(false)
+      return
+    }
+    
     setLoading(true)
     setError(null)
     try {
@@ -27,7 +33,7 @@ function useFetch(fetchFn, deps = []) {
     } finally {
       setLoading(false)
     }
-  }, deps)
+  }, [...deps, shouldFetch])
 
   useEffect(() => {
     refetch()
@@ -40,6 +46,7 @@ function useFetch(fetchFn, deps = []) {
 
 /**
  * Fetch user's rooms
+ * userId is kept for backwards compatibility but not used in API call
  */
 export function useRooms(userId) {
   const [data, setData] = useState(null)
@@ -57,8 +64,8 @@ export function useRooms(userId) {
     setError(null)
     
     try {
-      console.log('useRooms: Fetching rooms for user:', userId)
-      const result = await roomsService.getUserRooms(userId)
+      console.log('useRooms: Fetching rooms')
+      const result = await roomsService.getUserRooms()
       console.log('useRooms: Rooms fetched successfully:', result?.length, 'rooms')
       setData(result)
     } catch (err) {
@@ -82,8 +89,9 @@ export function useRooms(userId) {
  */
 export function useRoom(roomId, userId) {
   return useFetch(
-    () => roomId ? roomsService.getRoomWithStats(roomId, userId) : Promise.resolve(null),
-    [roomId, userId]
+    () => roomsService.getRoomWithStats(roomId),
+    [roomId],
+    !!roomId && !!userId
   )
 }
 
@@ -92,31 +100,32 @@ export function useRoom(roomId, userId) {
  */
 export function useRoomRules(roomId) {
   const { data, loading, error, refetch, setData } = useFetch(
-    () => roomId ? rulesService.getRoomRules(roomId) : Promise.resolve([]),
-    [roomId]
+    () => rulesService.getRoomRules(roomId),
+    [roomId],
+    !!roomId
   )
 
   const addRule = async (text) => {
     const newRule = await rulesService.addRule(roomId, text)
-    setData(prev => [...prev, newRule])
+    setData(prev => [...(prev || []), newRule])
     return newRule
   }
 
   const updateRule = async (ruleId, updates) => {
     const updated = await rulesService.updateRule(ruleId, updates)
-    setData(prev => prev.map(r => r.id === ruleId ? updated : r))
+    setData(prev => (prev || []).map(r => r.id === ruleId ? updated : r))
     return updated
   }
 
   const toggleRule = async (ruleId) => {
     const updated = await rulesService.toggleRule(ruleId)
-    setData(prev => prev.map(r => r.id === ruleId ? updated : r))
+    setData(prev => (prev || []).map(r => r.id === ruleId ? updated : r))
     return updated
   }
 
   const deleteRule = async (ruleId) => {
     await rulesService.deleteRule(ruleId)
-    setData(prev => prev.filter(r => r.id !== ruleId))
+    setData(prev => (prev || []).filter(r => r.id !== ruleId))
   }
 
   return { 
@@ -136,10 +145,9 @@ export function useRoomRules(roomId) {
  */
 export function useAttendance(roomId, userId) {
   const { data, loading, error, refetch } = useFetch(
-    () => roomId && userId 
-      ? attendanceService.getUserAttendance(roomId, userId) 
-      : Promise.resolve([]),
-    [roomId, userId]
+    () => attendanceService.getUserAttendance(roomId),
+    [roomId],
+    !!roomId && !!userId
   )
 
   const submitProof = async (proofFile, note) => {
@@ -167,10 +175,9 @@ export function useAttendance(roomId, userId) {
  */
 export function useRoomStats(roomId, userId) {
   return useFetch(
-    () => roomId && userId 
-      ? attendanceService.getRoomStats(roomId, userId) 
-      : Promise.resolve({ streak: 0, total: 0, percentage: 0 }),
-    [roomId, userId]
+    () => attendanceService.getRoomStats(roomId),
+    [roomId],
+    !!roomId && !!userId
   )
 }
 
@@ -193,7 +200,7 @@ export function useUserHistory(userId, options = {}) {
     setError(null)
     
     try {
-      const result = await attendanceService.getAllUserAttendance(userId, options)
+      const result = await attendanceService.getAllUserAttendance(options)
       setData(result)
     } catch (err) {
       console.error('Failed to fetch user history:', err)
@@ -215,19 +222,20 @@ export function useUserHistory(userId, options = {}) {
  */
 export function useRoomInvites(roomId) {
   const { data, loading, error, refetch, setData } = useFetch(
-    () => roomId ? invitesService.getRoomInvites(roomId) : Promise.resolve([]),
-    [roomId]
+    () => invitesService.getRoomInvites(roomId),
+    [roomId],
+    !!roomId
   )
 
   const createInvite = async () => {
     const invite = await invitesService.createInvite(roomId)
-    setData(prev => [...prev, invite])
+    setData(prev => [...(prev || []), invite])
     return invite
   }
 
   const revokeInvite = async (inviteId) => {
     await invitesService.revokeInvite(inviteId)
-    setData(prev => prev.filter(i => i.id !== inviteId))
+    setData(prev => (prev || []).filter(i => i.id !== inviteId))
   }
 
   return { 
@@ -247,8 +255,9 @@ export function useRoomInvites(roomId) {
  */
 export function useAdminRooms(adminId) {
   return useFetch(
-    () => adminId ? invitesService.getAdminRooms(adminId) : Promise.resolve([]),
-    [adminId]
+    () => invitesService.getAdminRooms(),
+    [adminId],
+    !!adminId
   )
 }
 
@@ -257,19 +266,18 @@ export function useAdminRooms(adminId) {
  */
 export function usePendingProofs(roomId) {
   const { data, loading, error, refetch } = useFetch(
-    () => roomId 
-      ? attendanceService.getPendingProofs(roomId) 
-      : Promise.resolve([]),
-    [roomId]
+    () => attendanceService.getPendingProofs(roomId),
+    [roomId],
+    !!roomId
   )
 
-  const approve = async (attendanceId, adminId) => {
-    await attendanceService.approveAttendance(attendanceId, adminId)
+  const approve = async (attendanceId) => {
+    await attendanceService.approveAttendance(attendanceId)
     refetch()
   }
 
-  const reject = async (attendanceId, adminId, reason) => {
-    await attendanceService.rejectAttendance(attendanceId, adminId, reason)
+  const reject = async (attendanceId, reason) => {
+    await attendanceService.rejectAttendance(attendanceId, reason)
     refetch()
   }
 
@@ -288,19 +296,18 @@ export function usePendingProofs(roomId) {
  */
 export function useAllPendingProofs(adminId) {
   const { data, loading, error, refetch } = useFetch(
-    () => adminId 
-      ? attendanceService.getAllPendingProofsForAdmin(adminId) 
-      : Promise.resolve([]),
-    [adminId]
+    () => attendanceService.getAllPendingProofsForAdmin(),
+    [adminId],
+    !!adminId
   )
 
   const approve = async (attendanceId) => {
-    await attendanceService.approveAttendance(attendanceId, adminId)
+    await attendanceService.approveAttendance(attendanceId)
     refetch()
   }
 
   const reject = async (attendanceId, reason) => {
-    await attendanceService.rejectAttendance(attendanceId, adminId, reason)
+    await attendanceService.rejectAttendance(attendanceId, reason)
     refetch()
   }
 

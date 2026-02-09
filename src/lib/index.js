@@ -4,6 +4,7 @@
  */
 
 export { supabase } from './supabase'
+export { api } from './api'
 export { authService } from './auth'
 export { roomsService } from './rooms'
 export { invitesService } from './invites'

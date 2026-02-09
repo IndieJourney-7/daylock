@@ -1,9 +1,11 @@
 /**
  * Authentication Service
  * Handles user auth with Supabase
+ * Profile operations go through backend API
  */
 
 import { supabase } from './supabase'
+import { api } from './api'
 
 export const authService = {
   /**
@@ -89,20 +91,19 @@ export const authService = {
   },
 
   /**
-   * Get user profile from profiles table
+   * Get user profile via API
    */
-  async getProfile(userId) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    if (error) throw error
-    return data
+  async getProfile() {
+    try {
+      return await api.profile.get()
+    } catch (error) {
+      console.error('Failed to get profile:', error)
+      return null
+    }
   },
 
   /**
-   * Ensure user profile exists - creates or updates from OAuth user data
+   * Ensure user profile exists - creates via API
    */
   async ensureProfile(user) {
     if (!user?.id) return null
@@ -112,75 +113,32 @@ export const authService = {
     const googleName = metadata.full_name || metadata.name || null
     const avatarUrl = metadata.avatar_url || metadata.picture || null
     
-    console.log('ensureProfile - Google metadata:', { googleName, avatarUrl, metadata })
+    console.log('ensureProfile - Google metadata:', { googleName, avatarUrl })
     
-    // Try to get existing profile
-    const { data: existing } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-    
-    if (existing) {
-      // Always update if we have a Google name and current name is missing/default
-      const needsUpdate = googleName && (
-        !existing.name || 
-        existing.name === 'User' || 
-        existing.name === user.email?.split('@')[0]
-      )
-      
-      if (needsUpdate) {
-        console.log('Updating profile name from:', existing.name, 'to:', googleName)
-        const { data, error } = await supabase
-          .from('profiles')
-          .update({ 
-            name: googleName, 
-            avatar_url: avatarUrl || existing.avatar_url,
-            updated_at: new Date().toISOString() 
-          })
-          .eq('id', user.id)
-          .select()
-          .single()
-        if (!error) return data
-      }
-      return existing
-    }
-    
-    // Create new profile
-    const name = googleName || user.email?.split('@')[0] || 'User'
-    console.log('Creating new profile with name:', name)
-    
-    const { data, error } = await supabase
-      .from('profiles')
-      .insert({
-        id: user.id,
+    try {
+      // Call API to ensure profile exists
+      const profile = await api.profile.ensure({
         email: user.email,
-        name,
+        name: googleName || user.email?.split('@')[0] || 'User',
         avatar_url: avatarUrl
       })
-      .select()
-      .single()
-    
-    if (error) {
-      console.error('Error creating profile:', error)
+      return profile
+    } catch (error) {
+      console.error('Error ensuring profile:', error)
       // Return a minimal fallback profile
-      return { id: user.id, email: user.email, name }
+      return { 
+        id: user.id, 
+        email: user.email, 
+        name: googleName || user.email?.split('@')[0] || 'User' 
+      }
     }
-    return data
   },
 
   /**
-   * Update user profile
+   * Update user profile via API
    */
   async updateProfile(userId, updates) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', userId)
-      .select()
-      .single()
-    if (error) throw error
-    return data
+    return api.profile.update(updates)
   },
 
   /**

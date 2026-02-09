@@ -1,115 +1,44 @@
 /**
- * Room Rules Service
- * Manage room rules (admin only)
+ * Rules Service
+ * API client for room rules operations
  */
 
-import { supabase } from './supabase'
+import { api } from './api'
 
 export const rulesService = {
   /**
    * Get rules for a room
    */
   async getRoomRules(roomId) {
-    const { data, error } = await supabase
-      .from('room_rules')
-      .select('*')
-      .eq('room_id', roomId)
-      .order('sort_order', { ascending: true })
-    
-    if (error) throw error
-    return data
+    return api.rules.getForRoom(roomId)
   },
 
   /**
-   * Add a new rule
+   * Add a rule to a room
    */
-  async addRule(roomId, text, sortOrder = 0) {
-    const { data, error } = await supabase
-      .from('room_rules')
-      .insert({
-        room_id: roomId,
-        text,
-        enabled: true,
-        sort_order: sortOrder
-      })
-      .select()
-      .single()
-    
-    if (error) throw error
-    return data
+  async addRule(roomId, text) {
+    return api.rules.add(roomId, text)
   },
 
   /**
    * Update a rule
    */
   async updateRule(ruleId, updates) {
-    const { data, error } = await supabase
-      .from('room_rules')
-      .update(updates)
-      .eq('id', ruleId)
-      .select()
-      .single()
-    
-    if (error) throw error
-    return data
+    return api.rules.update(ruleId, updates)
   },
 
   /**
-   * Toggle rule enabled/disabled
+   * Toggle rule enabled status
    */
   async toggleRule(ruleId) {
-    // First get current state
-    const { data: current, error: fetchError } = await supabase
-      .from('room_rules')
-      .select('enabled')
-      .eq('id', ruleId)
-      .single()
-    
-    if (fetchError) throw fetchError
-    
-    // Toggle
-    const { data, error } = await supabase
-      .from('room_rules')
-      .update({ enabled: !current.enabled })
-      .eq('id', ruleId)
-      .select()
-      .single()
-    
-    if (error) throw error
-    return data
+    return api.rules.toggle(ruleId)
   },
 
   /**
    * Delete a rule
    */
   async deleteRule(ruleId) {
-    const { error } = await supabase
-      .from('room_rules')
-      .delete()
-      .eq('id', ruleId)
-    
-    if (error) throw error
-  },
-
-  /**
-   * Bulk update rules (reorder, enable/disable multiple)
-   */
-  async bulkUpdateRules(rules) {
-    const { data, error } = await supabase
-      .from('room_rules')
-      .upsert(
-        rules.map((rule, index) => ({
-          id: rule.id,
-          room_id: rule.room_id,
-          text: rule.text,
-          enabled: rule.enabled,
-          sort_order: index
-        }))
-      )
-      .select()
-    
-    if (error) throw error
-    return data
+    return api.rules.delete(ruleId)
   }
 }
 
