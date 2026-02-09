@@ -55,11 +55,12 @@ function Rooms() {
   const handleCreateRoom = async (roomData) => {
     try {
       const result = await roomsService.createRoom(roomData)
-      refetch()
-      return result // return so modal can show the room_code
+      // Don't refetch() here — it causes loading=true which unmounts the modal.
+      // We refetch when the modal closes instead.
+      return result
     } catch (err) {
       console.error('Failed to create room:', err)
-      throw err // Re-throw so modal can show error
+      throw err
     }
   }
   
@@ -275,7 +276,10 @@ function Rooms() {
       {/* Modals */}
       <CreateRoomModal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => {
+          setShowCreateModal(false)
+          refetch()
+        }}
         onCreateRoom={handleCreateRoom}
       />
       

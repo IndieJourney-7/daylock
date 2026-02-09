@@ -7,10 +7,10 @@
  */
 
 import { useState } from 'react'
+import Picker from '@emoji-mart/react'
+import data from '@emoji-mart/data'
 import { Card, Button, Icon } from '../ui'
-
-// Available emojis for rooms
-const ROOM_EMOJIS = ['🏋️', '💼', '📚', '🧘', '🏃', '💻', '🎨', '🎵', '🍳', '🛏️', '📝', '🎯']
+import { invitesService } from '../../lib'
 
 function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
   const [name, setName] = useState('')
@@ -20,6 +20,8 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
   const [error, setError] = useState(null)
   const [createdRoom, setCreatedRoom] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [showPicker, setShowPicker] = useState(false)
+  const [isRegenerating, setIsRegenerating] = useState(false)
   
   if (!isOpen) return null
   
@@ -95,7 +97,28 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
     setError(null)
     setCreatedRoom(null)
     setCopied(false)
+    setShowPicker(false)
+    setIsRegenerating(false)
     onClose()
+  }
+  
+  const handleRegenerateCode = async () => {
+    if (!createdRoom?.id) return
+    setIsRegenerating(true)
+    setError(null)
+    try {
+      const invite = await invitesService.createInvite(createdRoom.id)
+      setCreatedRoom(prev => ({
+        ...prev,
+        invite_code: invite.invite_code,
+        room_code: invite.invite_code
+      }))
+      setCopied(false)
+    } catch (err) {
+      setError(err.message || 'Failed to generate new code')
+    } finally {
+      setIsRegenerating(false)
+    }
   }
   
   return (
@@ -162,6 +185,15 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
                 </span>
               </Button>
               
+              {/* Generate new code */}
+              <button
+                onClick={handleRegenerateCode}
+                disabled={isRegenerating}
+                className="w-full text-center text-gray-500 text-sm hover:text-gray-300 transition-colors disabled:opacity-50 mb-3"
+              >
+                {isRegenerating ? 'Generating...' : 'Generate new code'}
+              </button>
+              
               <p className="text-gray-600 text-xs">
                 Your admin will use this code to join and set timing &amp; rules for this room.
               </p>
@@ -205,23 +237,32 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
               {/* Emoji Selection */}
               <div className="mb-4">
                 <label className="block text-gray-400 text-sm mb-2">Choose Icon</label>
-                <div className="grid grid-cols-6 gap-2">
-                  {ROOM_EMOJIS.map((e) => (
-                    <button
-                      key={e}
-                      onClick={() => setEmoji(e)}
-                      className={`
-                        w-12 h-12 rounded-xl text-2xl flex items-center justify-center transition-all
-                        ${emoji === e 
-                          ? 'bg-accent/20 border-2 border-accent scale-110' 
-                          : 'bg-charcoal-500/30 border border-charcoal-400/20 hover:bg-charcoal-500/50'
-                        }
-                      `}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPicker(!showPicker)}
+                  className="flex items-center gap-3 w-full bg-charcoal-500/30 border border-charcoal-400/20 rounded-lg px-4 py-3 hover:bg-charcoal-500/50 transition-colors"
+                >
+                  <span className="text-3xl">{emoji}</span>
+                  <span className="text-gray-400 text-sm">Tap to change emoji</span>
+                </button>
+                {showPicker && (
+                  <div className="mt-2 rounded-xl overflow-hidden">
+                    <Picker
+                      data={data}
+                      onEmojiSelect={(e) => {
+                        setEmoji(e.native)
+                        setShowPicker(false)
+                      }}
+                      theme="dark"
+                      set="native"
+                      previewPosition="none"
+                      skinTonePosition="none"
+                      maxFrequentRows={1}
+                      perLine={7}
+                      categories={['people', 'activity', 'foods_and_drink', 'travel_and_places', 'objects', 'symbols']}
+                    />
+                  </div>
+                )}
               </div>
               
               {/* Info note about timing */}
