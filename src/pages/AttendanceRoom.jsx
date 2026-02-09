@@ -294,7 +294,7 @@ function AttendanceRoom() {
               return (
                 <div 
                   key={room.id}
-                  onClick={() => navigate(`/room/${room.id}`)}
+                  onClick={() => navigate(`/rooms/${room.id}`)}
                   className={`
                     p-4 rounded-xl border transition-colors cursor-pointer hover:bg-charcoal-500/20
                     ${room.todayStatus === 'approved' 

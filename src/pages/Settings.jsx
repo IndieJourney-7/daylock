@@ -88,7 +88,7 @@ function Settings() {
   
   const handleSignOut = async () => {
     await signOut()
-    navigate('/')
+    navigate('/login')
   }
 
   const handleNotificationChange = (key, value) => {
