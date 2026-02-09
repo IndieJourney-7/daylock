@@ -1,6 +1,8 @@
 /**
  * Create Room Modal
- * User creates a new room with name, emoji, and time window
+ * User creates a new room with name, description, and emoji
+ * Timing is controlled by admin — not the user
+ * Room code is auto-generated from the name (e.g. gym-878)
  */
 
 import { useState } from 'react'
@@ -9,41 +11,25 @@ import { Card, Button, Icon } from '../ui'
 // Available emojis for rooms
 const ROOM_EMOJIS = ['🏋️', '💼', '📚', '🧘', '🏃', '💻', '🎨', '🎵', '🍳', '🛏️', '📝', '🎯']
 
-// Preset time windows
-const TIME_PRESETS = [
-  { label: 'Early Morning', start: '05:00', end: '06:00' },
-  { label: 'Morning', start: '06:00', end: '08:00' },
-  { label: 'Work Hours', start: '09:00', end: '11:00' },
-  { label: 'Midday', start: '12:00', end: '14:00' },
-  { label: 'Afternoon', start: '15:00', end: '17:00' },
-  { label: 'Evening', start: '18:00', end: '20:00' },
-  { label: 'Night', start: '21:00', end: '22:00' },
-]
-
 function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
-  const [step, setStep] = useState(1) // 1: Basic Info, 2: Time Window
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [emoji, setEmoji] = useState('🎯')
-  const [selectedPreset, setSelectedPreset] = useState(null)
-  const [customStart, setCustomStart] = useState('')
-  const [customEnd, setCustomEnd] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState(null)
+  const [createdCode, setCreatedCode] = useState(null)
   
   if (!isOpen) return null
   
-  const timeStart = selectedPreset !== null
-    ? TIME_PRESETS[selectedPreset].start
-    : customStart
+  const canCreate = name.trim().length > 0
   
-  const timeEnd = selectedPreset !== null
-    ? TIME_PRESETS[selectedPreset].end
-    : customEnd
-  
-  const canProceed = step === 1 ? name.trim().length > 0 : (timeStart && timeEnd)
+  // Preview what the room code will look like
+  const codePreview = name.trim()
+    ? `${name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-XXX`
+    : ''
   
   const handleCreate = async () => {
-    if (!canProceed) return
+    if (!canCreate) return
     
     setIsCreating(true)
     setError(null)
@@ -51,13 +37,17 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
     try {
       const roomData = {
         name: name.trim(),
-        emoji,
-        time_start: timeStart,
-        time_end: timeEnd
+        description: description.trim(),
+        emoji
       }
       
-      await onCreateRoom(roomData)
-      handleClose()
+      const result = await onCreateRoom(roomData)
+      setCreatedCode(result?.room_code || null)
+      
+      // If no code returned, just close
+      if (!result?.room_code) {
+        handleClose()
+      }
     } catch (err) {
       setError(err.message || 'Failed to create room')
     } finally {
@@ -66,13 +56,11 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
   }
   
   const handleClose = () => {
-    setStep(1)
     setName('')
+    setDescription('')
     setEmoji('🎯')
-    setSelectedPreset(null)
-    setCustomStart('')
-    setCustomEnd('')
     setError(null)
+    setCreatedCode(null)
     onClose()
   }
   
@@ -89,7 +77,7 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-charcoal-400/10">
           <h2 className="text-lg font-semibold text-white">
-            {step === 1 ? 'Create New Room' : 'Set Time Window'}
+            {createdCode ? 'Room Created!' : 'Create New Room'}
           </h2>
           <button 
             onClick={handleClose}
@@ -101,10 +89,30 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
         
         {/* Content */}
         <div className="p-4 sm:p-6">
-          {step === 1 ? (
+          {createdCode ? (
+            /* Success state — show the generated room code */
+            <div className="text-center py-4">
+              <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center mx-auto mb-4 text-3xl">
+                {emoji}
+              </div>
+              <h3 className="text-white font-semibold text-lg mb-1">{name}</h3>
+              <p className="text-gray-500 text-sm mb-4">Your room has been created</p>
+              
+              <div className="bg-charcoal-500/30 border border-charcoal-400/20 rounded-xl p-4 mb-3">
+                <p className="text-gray-400 text-xs mb-1">Room Code</p>
+                <p className="text-accent text-2xl font-mono font-bold tracking-wider">
+                  {createdCode}
+                </p>
+              </div>
+              
+              <p className="text-gray-600 text-xs">
+                Invite an admin to set the timing and rules for this room.
+              </p>
+            </div>
+          ) : (
             <>
               {/* Room Name */}
-              <div className="mb-6">
+              <div className="mb-5">
                 <label className="block text-gray-400 text-sm mb-2">Room Name</label>
                 <input
                   type="text"
@@ -113,11 +121,32 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
                   placeholder="e.g., Gym, Work, Study..."
                   className="w-full bg-charcoal-500/30 border border-charcoal-400/20 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-accent/50 transition-colors"
                   autoFocus
+                  maxLength={30}
+                />
+                {codePreview && (
+                  <p className="text-gray-600 text-xs mt-1.5">
+                    Room code will be like: <span className="text-accent font-mono">{codePreview}</span>
+                  </p>
+                )}
+              </div>
+              
+              {/* Description */}
+              <div className="mb-5">
+                <label className="block text-gray-400 text-sm mb-2">
+                  Description <span className="text-gray-600">(optional)</span>
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="What's this room for?"
+                  rows={2}
+                  className="w-full bg-charcoal-500/30 border border-charcoal-400/20 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-accent/50 transition-colors resize-none"
+                  maxLength={200}
                 />
               </div>
               
               {/* Emoji Selection */}
-              <div>
+              <div className="mb-4">
                 <label className="block text-gray-400 text-sm mb-2">Choose Icon</label>
                 <div className="grid grid-cols-6 gap-2">
                   {ROOM_EMOJIS.map((e) => (
@@ -137,70 +166,12 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
                   ))}
                 </div>
               </div>
-            </>
-          ) : (
-            <>
-              {/* Time Presets */}
-              <div className="mb-6">
-                <label className="block text-gray-400 text-sm mb-2">Quick Select</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {TIME_PRESETS.map((preset, index) => (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        setSelectedPreset(index)
-                        setCustomStart('')
-                        setCustomEnd('')
-                      }}
-                      className={`
-                        p-3 rounded-xl text-left transition-all
-                        ${selectedPreset === index 
-                          ? 'bg-accent/20 border border-accent' 
-                          : 'bg-charcoal-500/30 border border-charcoal-400/20 hover:bg-charcoal-500/50'
-                        }
-                      `}
-                    >
-                      <p className={`text-sm font-medium ${selectedPreset === index ? 'text-accent' : 'text-white'}`}>
-                        {preset.label}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {preset.start} - {preset.end}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
               
-              {/* Custom Time */}
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Or Custom Time</label>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <input
-                      type="time"
-                      value={customStart}
-                      onChange={(e) => {
-                        setCustomStart(e.target.value)
-                        setSelectedPreset(null)
-                      }}
-                      className="w-full bg-charcoal-500/30 border border-charcoal-400/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-accent/50"
-                    />
-                    <p className="text-xs text-gray-600 mt-1">Start</p>
-                  </div>
-                  <div className="flex items-center text-gray-500">to</div>
-                  <div className="flex-1">
-                    <input
-                      type="time"
-                      value={customEnd}
-                      onChange={(e) => {
-                        setCustomEnd(e.target.value)
-                        setSelectedPreset(null)
-                      }}
-                      className="w-full bg-charcoal-500/30 border border-charcoal-400/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-accent/50"
-                    />
-                    <p className="text-xs text-gray-600 mt-1">End</p>
-                  </div>
-                </div>
+              {/* Info note about timing */}
+              <div className="p-3 rounded-lg bg-charcoal-500/20 border border-charcoal-400/10">
+                <p className="text-gray-500 text-xs leading-relaxed">
+                  Timing and rules will be set by your admin after you invite them.
+                </p>
               </div>
             </>
           )}
@@ -214,31 +185,16 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
         )}
         
         {/* Footer */}
-        <div className="p-4 border-t border-charcoal-400/10 flex gap-3">
-          {step === 2 && (
-            <Button 
-              variant="secondary" 
-              onClick={() => setStep(1)}
-              className="flex-1"
-            >
-              Back
-            </Button>
-          )}
-          
-          {step === 1 ? (
-            <Button 
-              size="full"
-              disabled={!canProceed}
-              onClick={() => setStep(2)}
-            >
-              Next
+        <div className="p-4 border-t border-charcoal-400/10">
+          {createdCode ? (
+            <Button size="full" onClick={handleClose}>
+              Done
             </Button>
           ) : (
             <Button 
               size="full"
-              disabled={!canProceed || isCreating}
+              disabled={!canCreate || isCreating}
               onClick={handleCreate}
-              className="flex-1"
             >
               {isCreating ? (
                 <span className="flex items-center justify-center gap-2">

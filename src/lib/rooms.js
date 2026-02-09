@@ -34,8 +34,7 @@ export const roomsService = {
     return api.rooms.create({
       name: roomData.name,
       emoji: roomData.emoji || '📋',
-      time_start: roomData.time_start || roomData.timeStart,
-      time_end: roomData.time_end || roomData.timeEnd
+      description: roomData.description || ''
     })
   },
 

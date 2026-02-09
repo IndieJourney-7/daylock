@@ -44,8 +44,8 @@ function Rooms() {
   // Calculate room statuses based on current time
   const roomsWithStatus = (rooms || []).map(room => ({
     ...room,
-    status: roomsService.isRoomOpen(room) ? 'open' : 'locked',
-    timeWindow: `${room.time_start} - ${room.time_end}`
+    status: (room.time_start && room.time_end) ? (roomsService.isRoomOpen(room) ? 'open' : 'locked') : 'pending-setup',
+    timeWindow: (room.time_start && room.time_end) ? `${room.time_start} - ${room.time_end}` : 'Timing not set'
   }))
   
   const openRooms = roomsWithStatus.filter(r => r.status === 'open').length
@@ -54,8 +54,9 @@ function Rooms() {
   
   const handleCreateRoom = async (roomData) => {
     try {
-      await roomsService.createRoom(user.id, roomData)
+      const result = await roomsService.createRoom(roomData)
       refetch()
+      return result // return so modal can show the room_code
     } catch (err) {
       console.error('Failed to create room:', err)
       throw err // Re-throw so modal can show error
@@ -159,7 +160,12 @@ function Rooms() {
                         {room.name}
                       </h3>
                     </div>
-                    <p className="text-gray-500 text-xs md:text-sm">{room.timeWindow}</p>
+                    <p className="text-gray-500 text-xs md:text-sm">
+                      {room.room_code && (
+                        <span className="text-accent font-mono mr-2">{room.room_code}</span>
+                      )}
+                      {room.timeWindow}
+                    </p>
                     
                     {/* Admin status */}
                     <div className="flex items-center gap-2 mt-1">
