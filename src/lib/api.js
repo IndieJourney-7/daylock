@@ -11,14 +11,39 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 console.log('API Client initialized with URL:', API_URL)
 
 /**
- * Get current auth token from Supabase
+ * Cached auth token - updated by onAuthStateChange listener
+ * This avoids calling getSession() which can deadlock during auth events
+ */
+let cachedToken = null
+
+// Listen for auth changes and cache the token
+supabase.auth.onAuthStateChange((event, session) => {
+  cachedToken = session?.access_token || null
+  console.log('API: Token updated from auth event:', event, cachedToken ? 'token set' : 'no token')
+})
+
+/**
+ * Get current auth token
+ * Uses cached token first, falls back to getSession()
  */
 async function getAuthToken() {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.access_token) {
-    console.warn('No auth token available')
+  if (cachedToken) {
+    return cachedToken
   }
-  return session?.access_token || null
+  
+  // Fallback: try getSession (may not work during onAuthStateChange)
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token) {
+      cachedToken = session.access_token
+      return cachedToken
+    }
+  } catch (err) {
+    console.warn('getSession failed:', err.message)
+  }
+  
+  console.warn('No auth token available')
+  return null
 }
 
 /**
