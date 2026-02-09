@@ -28,6 +28,13 @@ export const NAV_ITEMS = [
   { id: 'settings', label: 'Settings', path: '/settings', icon: 'settings' },
 ]
 
+// Admin navigation items
+export const ADMIN_NAV_ITEMS = [
+  { id: 'admin-dashboard', label: 'Admin Panel', path: '/admin', icon: 'shield' },
+  { id: 'admin-rooms', label: 'Managed Rooms', path: '/admin/rooms', icon: 'rooms' },
+  { id: 'admin-settings', label: 'Admin Settings', path: '/admin/settings', icon: 'settings' },
+]
+
 // Days of week
 export const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 

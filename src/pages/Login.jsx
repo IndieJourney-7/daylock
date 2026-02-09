@@ -128,20 +128,24 @@ function Login() {
               )}
             </button>
             
-            {/* Divider */}
-            <div className="flex items-center gap-3 my-6">
-              <div className="flex-1 h-px bg-charcoal-400/20" />
-              <span className="text-gray-600 text-xs">or</span>
-              <div className="flex-1 h-px bg-charcoal-400/20" />
+            {/* Role Selection Info */}
+            <div className="mt-6 p-4 rounded-xl bg-charcoal-500/20 border border-charcoal-400/10">
+              <p className="text-gray-400 text-xs text-center mb-3">
+                After signing in, choose your role:
+              </p>
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div className="p-2 rounded-lg bg-charcoal-500/30">
+                  <Icon name="user" className="w-5 h-5 text-accent mx-auto mb-1" />
+                  <p className="text-white text-xs font-medium">User</p>
+                  <p className="text-gray-600 text-[10px]">Create rooms & track habits</p>
+                </div>
+                <div className="p-2 rounded-lg bg-charcoal-500/30">
+                  <Icon name="shield" className="w-5 h-5 text-accent mx-auto mb-1" />
+                  <p className="text-white text-xs font-medium">Admin</p>
+                  <p className="text-gray-600 text-[10px]">Manage others' rooms</p>
+                </div>
+              </div>
             </div>
-            
-            {/* Admin Link */}
-            <Link
-              to="/admin/join"
-              className="block w-full text-center py-3 px-4 rounded-xl border border-charcoal-400/20 text-gray-400 hover:text-white hover:border-charcoal-400/40 transition-colors text-sm"
-            >
-              Join as Admin with invite code
-            </Link>
           </div>
           
           {/* Footer Info */}

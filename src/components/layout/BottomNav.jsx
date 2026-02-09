@@ -10,9 +10,9 @@ import { Icon } from '../ui'
 // Mobile nav only shows key items
 const MOBILE_NAV_ITEMS = [
   { id: 'home', label: 'Home', path: '/dashboard', icon: 'home' },
-  { id: 'history', label: 'History', path: '/history', icon: 'history' },
+  { id: 'rooms', label: 'Rooms', path: '/rooms', icon: 'rooms' },
+  { id: 'admin', label: 'Admin', path: '/admin', icon: 'shield' },
   { id: 'profile', label: 'Profile', path: '/profile', icon: 'profile' },
-  { id: 'settings', label: 'Settings', path: '/settings', icon: 'settings' },
 ]
 
 function BottomNav() {

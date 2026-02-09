@@ -53,6 +53,25 @@ function Sidebar() {
             </li>
           ))}
         </ul>
+        
+        {/* Admin Panel Link */}
+        <div className="mt-6 pt-6 border-t border-charcoal-400/10">
+          <p className="px-4 text-gray-600 text-xs uppercase tracking-wider mb-2">Admin</p>
+          <NavLink
+            to="/admin"
+            className={({ isActive }) => `
+              flex items-center gap-3 px-4 py-3 rounded-lg
+              transition-all duration-200
+              ${isActive 
+                ? 'bg-accent/20 text-accent' 
+                : 'text-gray-400 hover:text-white hover:bg-charcoal-600/30'
+              }
+            `}
+          >
+            <Icon name="shield" className="w-5 h-5" />
+            <span className="font-medium text-sm">Admin Panel</span>
+          </NavLink>
+        </div>
       </nav>
       
       {/* User Profile & Logout */}
