@@ -161,8 +161,8 @@ function Rooms() {
                       </h3>
                     </div>
                     <p className="text-gray-500 text-xs md:text-sm">
-                      {room.room_code && (
-                        <span className="text-accent font-mono mr-2">{room.room_code}</span>
+                      {room.pending_invite?.invite_code && (
+                        <span className="text-accent font-mono mr-2">{room.pending_invite.invite_code}</span>
                       )}
                       {room.timeWindow}
                     </p>

@@ -2,7 +2,8 @@
  * Create Room Modal
  * User creates a new room with name, description, and emoji
  * Timing is controlled by admin — not the user
- * Room code is auto-generated from the name (e.g. gym-878)
+ * Invite code is auto-generated from the room name (e.g. gym-878)
+ * After creation, shows the code so user can share it with their admin
  */
 
 import { useState } from 'react'
@@ -17,16 +18,19 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
   const [emoji, setEmoji] = useState('🎯')
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState(null)
-  const [createdCode, setCreatedCode] = useState(null)
+  const [createdRoom, setCreatedRoom] = useState(null)
+  const [copied, setCopied] = useState(false)
   
   if (!isOpen) return null
   
   const canCreate = name.trim().length > 0
   
-  // Preview what the room code will look like
+  // Preview what the invite code will look like
   const codePreview = name.trim()
     ? `${name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-XXX`
     : ''
+  
+  const inviteCode = createdRoom?.invite_code || createdRoom?.room_code || null
   
   const handleCreate = async () => {
     if (!canCreate) return
@@ -42,10 +46,10 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
       }
       
       const result = await onCreateRoom(roomData)
-      setCreatedCode(result?.room_code || null)
+      setCreatedRoom(result || null)
       
-      // If no code returned, just close
-      if (!result?.room_code) {
+      // If no invite code returned, just close
+      if (!result?.invite_code && !result?.room_code) {
         handleClose()
       }
     } catch (err) {
@@ -55,12 +59,42 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
     }
   }
   
+  const handleCopy = async () => {
+    if (!inviteCode) return
+    try {
+      await navigator.clipboard.writeText(inviteCode)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+  
+  const handleShare = async () => {
+    if (!inviteCode) return
+    const shareData = {
+      title: 'Daylock Room Invite',
+      text: `Join my "${name}" room on Daylock as an admin. Use code: ${inviteCode}`,
+      url: window.location.origin + '/admin/join?code=' + inviteCode
+    }
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData)
+      } else {
+        handleCopy()
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') handleCopy()
+    }
+  }
+  
   const handleClose = () => {
     setName('')
     setDescription('')
     setEmoji('🎯')
     setError(null)
-    setCreatedCode(null)
+    setCreatedRoom(null)
+    setCopied(false)
     onClose()
   }
   
@@ -77,7 +111,7 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-charcoal-400/10">
           <h2 className="text-lg font-semibold text-white">
-            {createdCode ? 'Room Created!' : 'Create New Room'}
+            {createdRoom ? 'Room Created!' : 'Create New Room'}
           </h2>
           <button 
             onClick={handleClose}
@@ -89,24 +123,47 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
         
         {/* Content */}
         <div className="p-4 sm:p-6">
-          {createdCode ? (
-            /* Success state — show the generated room code */
-            <div className="text-center py-4">
+          {createdRoom ? (
+            /* Success state — show the generated invite code */
+            <div className="text-center py-2">
               <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center mx-auto mb-4 text-3xl">
                 {emoji}
               </div>
               <h3 className="text-white font-semibold text-lg mb-1">{name}</h3>
-              <p className="text-gray-500 text-sm mb-4">Your room has been created</p>
+              <p className="text-gray-500 text-sm mb-5">Share this code with your admin</p>
               
-              <div className="bg-charcoal-500/30 border border-charcoal-400/20 rounded-xl p-4 mb-3">
-                <p className="text-gray-400 text-xs mb-1">Room Code</p>
-                <p className="text-accent text-2xl font-mono font-bold tracking-wider">
-                  {createdCode}
-                </p>
+              {/* Invite Code Display */}
+              <div className="bg-charcoal-900 border border-charcoal-400/20 rounded-xl p-5 mb-4">
+                <p className="text-gray-500 text-xs mb-2">Invite Code</p>
+                <div className="flex items-center justify-center gap-3">
+                  <p className="text-accent text-2xl font-mono font-bold tracking-wider">
+                    {inviteCode}
+                  </p>
+                  <button
+                    onClick={handleCopy}
+                    className="p-2 hover:bg-charcoal-500/50 rounded-lg transition-colors"
+                  >
+                    <Icon 
+                      name={copied ? 'check' : 'copy'} 
+                      className={`w-5 h-5 ${copied ? 'text-accent' : 'text-gray-400'}`} 
+                    />
+                  </button>
+                </div>
+                {copied && (
+                  <p className="text-accent text-xs mt-2">Copied to clipboard!</p>
+                )}
               </div>
               
+              {/* Share button */}
+              <Button size="full" onClick={handleShare} className="mb-3">
+                <span className="flex items-center justify-center gap-2">
+                  <Icon name="share" className="w-4 h-4" />
+                  Share with Admin
+                </span>
+              </Button>
+              
               <p className="text-gray-600 text-xs">
-                Invite an admin to set the timing and rules for this room.
+                Your admin will use this code to join and set timing &amp; rules for this room.
               </p>
             </div>
           ) : (
@@ -125,7 +182,7 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
                 />
                 {codePreview && (
                   <p className="text-gray-600 text-xs mt-1.5">
-                    Room code will be like: <span className="text-accent font-mono">{codePreview}</span>
+                    Invite code will be like: <span className="text-accent font-mono">{codePreview}</span>
                   </p>
                 )}
               </div>
@@ -186,8 +243,8 @@ function CreateRoomModal({ isOpen, onClose, onCreateRoom }) {
         
         {/* Footer */}
         <div className="p-4 border-t border-charcoal-400/10">
-          {createdCode ? (
-            <Button size="full" onClick={handleClose}>
+          {createdRoom ? (
+            <Button size="full" variant="secondary" onClick={handleClose}>
               Done
             </Button>
           ) : (
