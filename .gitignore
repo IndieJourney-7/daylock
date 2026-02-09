@@ -36,3 +36,6 @@ dist-ssr
 # Build outputs
 build
 coverage
+
+# Backend (separate repo)
+backend/
