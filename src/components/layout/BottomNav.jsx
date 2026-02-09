@@ -11,6 +11,7 @@ import { Icon } from '../ui'
 const MOBILE_NAV_ITEMS = [
   { id: 'home', label: 'Home', path: '/dashboard', icon: 'home' },
   { id: 'rooms', label: 'Rooms', path: '/rooms', icon: 'rooms' },
+  { id: 'analytics', label: 'Analytics', path: '/analytics', icon: 'chart' },
   { id: 'admin', label: 'Admin', path: '/admin', icon: 'shield' },
   { id: 'profile', label: 'Profile', path: '/profile', icon: 'profile' },
 ]

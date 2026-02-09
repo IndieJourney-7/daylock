@@ -204,6 +204,13 @@ export const api = {
     delete: (ruleId) => request(`/api/rules/${ruleId}`, {
       method: 'DELETE'
     })
+  },
+  
+  // Analytics
+  analytics: {
+    user: () => request('/api/analytics/user'),
+    admin: () => request('/api/analytics/admin'),
+    adminUser: (userId) => request(`/api/analytics/admin/user/${userId}`)
   }
 }
 

@@ -32,8 +32,11 @@ import {
   AdminDashboard, 
   AdminRooms, 
   AdminRoomDetail, 
-  AdminSettings 
+  AdminSettings,
+  AdminAnalytics,
+  AdminUserAnalytics 
 } from './pages/admin'
+import Analytics from './pages/Analytics'
 
 // Landing Page Component
 function LandingPage() {
@@ -73,6 +76,7 @@ function App() {
           <Route path="/rooms" element={<Rooms />} />
           <Route path="/rooms/attendance" element={<AttendanceRoom />} />
           <Route path="/rooms/:roomId" element={<RoomDetail />} />
+          <Route path="/analytics" element={<Analytics />} />
           <Route path="/history" element={<History />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
@@ -90,6 +94,8 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/rooms" element={<AdminRooms />} />
           <Route path="/admin/rooms/:roomId" element={<AdminRoomDetail />} />
+          <Route path="/admin/analytics" element={<AdminAnalytics />} />
+          <Route path="/admin/analytics/user/:userId" element={<AdminUserAnalytics />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
         </Route>
         

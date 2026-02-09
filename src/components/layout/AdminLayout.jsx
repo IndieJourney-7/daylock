@@ -7,13 +7,7 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { Icon } from '../ui'
-
-// Admin navigation items
-const ADMIN_NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', path: '/admin', icon: 'home' },
-  { id: 'rooms', label: 'My Rooms', path: '/admin/rooms', icon: 'rooms' },
-  { id: 'settings', label: 'Settings', path: '/admin/settings', icon: 'settings' },
-]
+import { ADMIN_NAV_ITEMS } from '../../constants'
 
 function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
