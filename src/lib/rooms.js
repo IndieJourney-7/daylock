@@ -47,6 +47,27 @@ export const roomsService = {
   },
 
   /**
+   * Admin update a room (time window, toggles, description)
+   */
+  async adminUpdateRoom(roomId, updates) {
+    return api.rooms.adminUpdate(roomId, updates)
+  },
+
+  /**
+   * Toggle room pause (admin)
+   */
+  async toggleRoomPause(roomId) {
+    return api.rooms.togglePause(roomId)
+  },
+
+  /**
+   * Toggle allow late upload (admin)
+   */
+  async toggleLateUpload(roomId) {
+    return api.rooms.toggleLateUpload(roomId)
+  },
+
+  /**
    * Delete a room
    */
   async deleteRoom(roomId) {

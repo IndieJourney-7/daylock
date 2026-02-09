@@ -127,6 +127,16 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data)
     }),
+    adminUpdate: (roomId, data) => request(`/api/rooms/${roomId}/admin-update`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }),
+    togglePause: (roomId) => request(`/api/rooms/${roomId}/toggle-pause`, {
+      method: 'POST'
+    }),
+    toggleLateUpload: (roomId) => request(`/api/rooms/${roomId}/toggle-late-upload`, {
+      method: 'POST'
+    }),
     delete: (roomId) => request(`/api/rooms/${roomId}`, {
       method: 'DELETE'
     })
