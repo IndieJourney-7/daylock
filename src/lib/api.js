@@ -7,11 +7,17 @@ import { supabase } from './supabase'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
+// Debug: Log API URL on load
+console.log('API Client initialized with URL:', API_URL)
+
 /**
  * Get current auth token from Supabase
  */
 async function getAuthToken() {
   const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    console.warn('No auth token available')
+  }
   return session?.access_token || null
 }
 
@@ -30,24 +36,36 @@ async function request(endpoint, options = {}) {
     }
   }
   
-  const response = await fetch(`${API_URL}${endpoint}`, config)
+  const url = `${API_URL}${endpoint}`
+  console.log(`API Request: ${options.method || 'GET'} ${url}`)
   
-  // Handle non-JSON responses
-  const contentType = response.headers.get('content-type')
-  if (!contentType || !contentType.includes('application/json')) {
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+  try {
+    const response = await fetch(url, config)
+    
+    console.log(`API Response: ${response.status} ${response.statusText}`)
+    
+    // Handle non-JSON responses
+    const contentType = response.headers.get('content-type')
+    if (!contentType || !contentType.includes('application/json')) {
+      if (!response.ok) {
+        console.error(`API Error (non-JSON): ${response.status}`)
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      return null
     }
-    return null
+    
+    const data = await response.json()
+    
+    if (!response.ok) {
+      console.error('API Error:', data)
+      throw new Error(data.message || data.error || 'API request failed')
+    }
+    
+    return data
+  } catch (error) {
+    console.error(`API Request failed: ${url}`, error.message)
+    throw error
   }
-  
-  const data = await response.json()
-  
-  if (!response.ok) {
-    throw new Error(data.message || data.error || 'API request failed')
-  }
-  
-  return data
 }
 
 /**
