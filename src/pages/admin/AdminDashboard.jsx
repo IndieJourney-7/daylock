@@ -76,28 +76,11 @@ function AdminDashboard() {
     setInviteSuccess(null)
     
     try {
-      // First verify the code
-      const invite = await invitesService.getInviteByCode(inviteCode.trim())
+      // Accept the invite directly — acceptInvite handles all validation
+      // including duplicate check, invalid code, and already-used codes
+      const result = await invitesService.acceptInvite(inviteCode.trim(), user.id)
       
-      if (!invite) {
-        setInviteError('Invalid invite code. Please check and try again.')
-        return
-      }
-      
-      if (invite.status === 'accepted') {
-        setInviteError('This invite has already been used.')
-        return
-      }
-      
-      if (invite.status === 'revoked') {
-        setInviteError('This invite has been revoked.')
-        return
-      }
-      
-      // Accept the invite
-      await invitesService.acceptInvite(invite.invite_code, user.id)
-      
-      setInviteSuccess(`You are now managing "${invite.room?.name || 'the room'}"!`)
+      setInviteSuccess(`You are now managing "${result.room?.name || 'the room'}"!`)
       setInviteCode('')
       
       // Refetch rooms to show the new room

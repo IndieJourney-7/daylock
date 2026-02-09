@@ -100,6 +100,24 @@ export const invitesService = {
       throw new Error('This invite has already been used')
     }
     
+    // Check if admin already manages this room (prevent duplicates)
+    const { data: existing } = await supabase
+      .from('room_invites')
+      .select('id')
+      .eq('room_id', invite.room_id)
+      .eq('admin_id', adminId)
+      .eq('status', 'accepted')
+      .maybeSingle()
+    
+    if (existing) {
+      throw new Error('You are already managing this room')
+    }
+    
+    // Check if admin is the room owner
+    if (invite.room?.user?.id === adminId) {
+      throw new Error('You cannot be admin of your own room')
+    }
+    
     // Update invite with admin
     const { data, error } = await supabase
       .from('room_invites')
@@ -179,13 +197,64 @@ export const invitesService = {
     
     if (error) throw error
     
-    // Flatten the data structure
-    return data.map(invite => ({
-      ...invite.room,
-      inviteCode: invite.invite_code,
-      assignedBy: invite.room.user,
-      assignedAt: invite.accepted_at
-    }))
+    const today = new Date().toISOString().split('T')[0]
+    
+    // For each room, fetch attendance stats and today's status
+    const roomsWithStats = await Promise.all(
+      data.map(async (invite) => {
+        const room = invite.room
+        const userId = room.user_id
+        
+        // Fetch attendance for this room+user
+        const { data: attendance, error: attError } = await supabase
+          .from('attendance')
+          .select('*')
+          .eq('room_id', room.id)
+          .eq('user_id', userId)
+          .order('date', { ascending: false })
+        
+        if (attError) {
+          console.error('Failed to fetch attendance for room:', room.id, attError)
+        }
+        
+        const records = attendance || []
+        const approvedDays = records.filter(a => a.status === 'approved').length
+        const totalDays = records.length
+        const attendanceRate = totalDays > 0 ? Math.round((approvedDays / totalDays) * 100) : 0
+        
+        // Calculate streak
+        let streak = 0
+        for (const record of records) {
+          if (record.status === 'approved') streak++
+          else break
+        }
+        
+        // Today's record
+        const todayRecord = records.find(a => a.date === today) || null
+        
+        // Count pending proofs
+        const pendingCount = records.filter(a => a.status === 'pending_review').length
+        
+        return {
+          ...room,
+          inviteCode: invite.invite_code,
+          assignedBy: room.user,
+          assignedAt: invite.accepted_at,
+          stats: {
+            streak,
+            attendanceRate,
+            approvedDays,
+            totalDays,
+            missedDays: records.filter(a => a.status === 'missed').length,
+            rejectedDays: records.filter(a => a.status === 'rejected').length,
+          },
+          today_attendance: todayRecord,
+          pending_proofs_count: pendingCount
+        }
+      })
+    )
+    
+    return roomsWithStats
   }
 }
 

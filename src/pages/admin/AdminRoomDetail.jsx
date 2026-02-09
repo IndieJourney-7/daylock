@@ -64,7 +64,7 @@ function AdminRoomDetail() {
       
       setLoading(true)
       try {
-        // Get all admin rooms and find this one
+        // Get all admin rooms and find this one (now includes stats)
         const adminRooms = await invitesService.getAdminRooms(user.id)
         const foundRoom = adminRooms.find(r => r.id === roomId)
         
@@ -73,13 +73,7 @@ function AdminRoomDetail() {
           return
         }
         
-        // Get room stats
-        const stats = await roomsService.getRoomWithStats(roomId, foundRoom.user_id)
-        
-        setRoom({
-          ...foundRoom,
-          stats: stats?.stats || { streak: 0, attendanceRate: 0, approvedDays: 0, missedDays: 0 }
-        })
+        setRoom(foundRoom)
         
         setTimeWindow({
           start: foundRoom.time_start || '06:00',
@@ -133,7 +127,7 @@ function AdminRoomDetail() {
   // Approve proof
   const handleApprove = async (proofId) => {
     try {
-      await approve(proofId)
+      await approve(proofId, user.id)
       setSelectedProof(null)
     } catch (err) {
       console.error('Failed to approve:', err)
@@ -143,7 +137,7 @@ function AdminRoomDetail() {
   // Reject proof
   const handleReject = async (proofId) => {
     try {
-      await reject(proofId, rejectReason)
+      await reject(proofId, user.id, rejectReason)
       setSelectedProof(null)
       setRejectReason('')
     } catch (err) {

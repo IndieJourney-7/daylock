@@ -57,7 +57,7 @@ function RoomDetail() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { data: room, loading, error } = useRoom(roomId, user?.id)
-  const { data: attendanceData } = useAttendance(roomId, user?.id)
+  const { attendance: attendanceData, submitProof } = useAttendance(roomId, user?.id)
   const fileInputRef = useRef(null)
   
   // Calendar state
@@ -93,9 +93,8 @@ function RoomDetail() {
   const isOpen = roomsService.isRoomOpen(room)
   const timeWindow = `${room.time_start} - ${room.time_end}`
   const rules = room.room_rules || []
-  const invite = room.room_invites?.[0]
-  const admin = invite?.admin
-  const inviteCode = invite?.invite_code
+  const admin = room.admin || null
+  const inviteCode = room.pending_invite?.invite_code || room.room_invites?.find(i => i.status === 'accepted')?.invite_code || null
   
   // Build attendance map from attendanceData
   const attendanceMap = {}
@@ -176,12 +175,15 @@ function RoomDetail() {
   const handleSubmit = async () => {
     if (!selectedFile || !isOpen) return
     setIsSubmitting(true)
-    // Simulate upload - will be replaced with Supabase
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setIsSubmitting(false)
-    clearFile()
-    setNote('')
-    // Would show success toast here
+    try {
+      await submitProof(selectedFile, note)
+      clearFile()
+      setNote('')
+    } catch (err) {
+      console.error('Failed to submit proof:', err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
   
   // Get attendance status styling for calendar day

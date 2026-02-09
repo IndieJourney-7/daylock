@@ -263,13 +263,13 @@ export function usePendingProofs(roomId) {
     [roomId]
   )
 
-  const approve = async (attendanceId, note) => {
-    await attendanceService.approveAttendance(attendanceId, note)
+  const approve = async (attendanceId, adminId) => {
+    await attendanceService.approveAttendance(attendanceId, adminId)
     refetch()
   }
 
-  const reject = async (attendanceId, note) => {
-    await attendanceService.rejectAttendance(attendanceId, note)
+  const reject = async (attendanceId, adminId, reason) => {
+    await attendanceService.rejectAttendance(attendanceId, adminId, reason)
     refetch()
   }
 
@@ -294,13 +294,13 @@ export function useAllPendingProofs(adminId) {
     [adminId]
   )
 
-  const approve = async (attendanceId, note) => {
-    await attendanceService.approveAttendance(attendanceId, note)
+  const approve = async (attendanceId) => {
+    await attendanceService.approveAttendance(attendanceId, adminId)
     refetch()
   }
 
-  const reject = async (attendanceId, note) => {
-    await attendanceService.rejectAttendance(attendanceId, note)
+  const reject = async (attendanceId, reason) => {
+    await attendanceService.rejectAttendance(attendanceId, adminId, reason)
     refetch()
   }
 
