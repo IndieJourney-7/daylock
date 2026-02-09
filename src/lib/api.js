@@ -209,6 +209,7 @@ export const api = {
   // Analytics
   analytics: {
     user: () => request('/api/analytics/user'),
+    userRoom: (roomId) => request(`/api/analytics/user/room/${roomId}`),
     admin: () => request('/api/analytics/admin'),
     adminUser: (userId) => request(`/api/analytics/admin/user/${userId}`)
   }
