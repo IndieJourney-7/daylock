@@ -25,7 +25,7 @@ function AdminSettings() {
   const [isSaving, setIsSaving] = useState(false)
   
   const totalRooms = rooms?.length || 0
-  const activeInvites = rooms?.filter(r => !r.admin_id)?.length || 0
+  const pendingProofs = rooms?.reduce((sum, r) => sum + (r.pending_proofs_count || 0), 0) || 0
   
   const joinedAt = profile?.created_at || user?.created_at
   const joinedDate = joinedAt ? new Date(joinedAt).toLocaleDateString('en-US', {
@@ -115,8 +115,8 @@ function AdminSettings() {
             <p className="text-gray-500 text-xs mt-1">Rooms Managing</p>
           </div>
           <div className="p-4 rounded-lg bg-charcoal-500/30 text-center">
-            <p className="text-white text-2xl font-bold">{activeInvites}</p>
-            <p className="text-gray-500 text-xs mt-1">Pending Invites</p>
+            <p className="text-white text-2xl font-bold">{pendingProofs}</p>
+            <p className="text-gray-500 text-xs mt-1">Pending Proofs</p>
           </div>
         </div>
       </Card>

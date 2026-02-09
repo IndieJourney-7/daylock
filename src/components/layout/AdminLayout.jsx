@@ -89,7 +89,7 @@ function AdminLayout() {
         {/* Footer */}
         <div className="p-4 border-t border-charcoal-400/10">
           <button 
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/dashboard')}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-charcoal-500/50 hover:text-white transition-all w-full"
           >
             <Icon name="chevronLeft" className="w-5 h-5" />
@@ -156,7 +156,7 @@ function AdminLayout() {
         {/* Back to app */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-charcoal-400/10">
           <button 
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/dashboard')}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-charcoal-500/50 hover:text-white transition-all w-full"
           >
             <Icon name="chevronLeft" className="w-5 h-5" />
