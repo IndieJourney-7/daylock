@@ -126,7 +126,7 @@ function AttendanceRoom() {
         todayStatus: status,
         todayRecord,
         isOpen,
-        timeWindow: `${room.time_start || '—'} - ${room.time_end || '—'}`
+        timeWindow: roomsService.getTimeWindow(room)
       }
     })
   }, [rooms, todayStatuses])

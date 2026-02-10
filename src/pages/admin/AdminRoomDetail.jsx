@@ -207,7 +207,7 @@ function AdminRoomDetail() {
             {room.is_paused ? <Badge variant="paused" size="sm">Paused</Badge> :
              isOpen ? <Badge variant="open" size="sm">Open</Badge> : <Badge variant="locked" size="sm">Locked</Badge>}
           </div>
-          <p className="text-gray-500 text-xs">{room.time_start} – {room.time_end}</p>
+          <p className="text-gray-500 text-xs">{roomsService.getTimeWindow(room)}</p>
         </div>
         {proofs.length > 0 && (
           <Badge variant="warning">{proofs.length} pending</Badge>

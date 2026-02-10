@@ -98,7 +98,7 @@ function RoomDetail() {
   
   // Derive data from room
   const isOpen = roomsService.isRoomOpen(room)
-  const timeWindow = `${room.time_start} - ${room.time_end}`
+  const timeWindow = roomsService.getTimeWindow(room)
   const rules = room.room_rules || []
   const admin = room.admin || null
   const inviteCode = room.pending_invite?.invite_code || room.room_invites?.find(i => i.status === 'accepted')?.invite_code || null

@@ -86,9 +86,31 @@ export const roomsService = {
    */
   isRoomOpen(room) {
     if (!room?.time_start || !room?.time_end) return false
+    
+    // Handle PostgreSQL TIME format (HH:MM:SS) by taking first 5 chars
+    const roomStart = room.time_start.slice(0, 5) // "08:30:00" -> "08:30"
+    const roomEnd = room.time_end.slice(0, 5)     // "18:00:00" -> "18:00"
+    
     const now = new Date()
     const currentTime = now.toTimeString().slice(0, 5) // HH:MM format
-    return currentTime >= room.time_start && currentTime <= room.time_end
+    
+    return currentTime >= roomStart && currentTime <= roomEnd
+  },
+
+  /**
+   * Format time from PostgreSQL TIME format (HH:MM:SS) to display format (HH:MM)
+   */
+  formatTime(time) {
+    if (!time) return '—'
+    return time.slice(0, 5) // "08:30:00" -> "08:30"
+  },
+
+  /**
+   * Get formatted time window string
+   */
+  getTimeWindow(room) {
+    if (!room?.time_start || !room?.time_end) return 'Timing not set'
+    return `${this.formatTime(room.time_start)} - ${this.formatTime(room.time_end)}`
   }
 }
 

@@ -45,7 +45,7 @@ function Rooms() {
   const roomsWithStatus = (rooms || []).map(room => ({
     ...room,
     status: (room.time_start && room.time_end) ? (roomsService.isRoomOpen(room) ? 'open' : 'locked') : 'pending-setup',
-    timeWindow: (room.time_start && room.time_end) ? `${room.time_start} - ${room.time_end}` : 'Timing not set'
+    timeWindow: roomsService.getTimeWindow(room)
   }))
   
   const openRooms = roomsWithStatus.filter(r => r.status === 'open').length

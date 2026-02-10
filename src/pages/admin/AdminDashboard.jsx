@@ -14,20 +14,28 @@ import { roomsService, invitesService } from '../../lib'
 // Status config helper
 const getStatusConfig = (todayProof, room) => {
   if (room?.is_paused) {
-    return { label: 'Paused', color: 'text-orange-400', bg: 'bg-orange-500/10 border border-orange-500/20', icon: 'pause', dot: 'bg-orange-400' }
+    return { label: 'Paused', sublabel: 'Room paused by you', color: 'text-orange-400', bg: 'bg-orange-500/10 border border-orange-500/20', icon: 'pause', dot: 'bg-orange-400' }
   }
   if (!todayProof) {
-    return { label: 'Waiting', color: 'text-gray-400', bg: 'bg-charcoal-500/30 border border-charcoal-400/10', icon: 'clock', dot: 'bg-gray-400' }
+    // No proof submitted yet - check if room is open or closed
+    const isOpen = roomsService.isRoomOpen(room)
+    if (isOpen) {
+      return { label: 'Open', sublabel: 'Waiting for user to submit', color: 'text-blue-400', bg: 'bg-blue-500/10 border border-blue-500/20', icon: 'clock', dot: 'bg-blue-400' }
+    } else {
+      return { label: 'No Proof', sublabel: 'User missed today', color: 'text-gray-400', bg: 'bg-charcoal-500/30 border border-charcoal-400/10', icon: 'clock', dot: 'bg-gray-400' }
+    }
   }
   switch (todayProof.status) {
     case 'approved':
-      return { label: 'Done', color: 'text-accent', bg: 'bg-accent/10 border border-accent/20', icon: 'check', dot: 'bg-accent' }
+      return { label: 'Done', sublabel: 'Proof approved', color: 'text-accent', bg: 'bg-accent/10 border border-accent/20', icon: 'check', dot: 'bg-accent' }
     case 'pending_review':
-      return { label: 'Review', color: 'text-yellow-400', bg: 'bg-yellow-500/10 border border-yellow-500/20', icon: 'camera', dot: 'bg-yellow-400' }
+      return { label: 'Review', sublabel: 'Needs your approval', color: 'text-yellow-400', bg: 'bg-yellow-500/10 border border-yellow-500/20', icon: 'camera', dot: 'bg-yellow-400' }
     case 'rejected':
-      return { label: 'Rejected', color: 'text-red-400', bg: 'bg-red-500/10 border border-red-500/20', icon: 'close', dot: 'bg-red-400' }
+      return { label: 'Rejected', sublabel: 'Waiting for resubmission', color: 'text-red-400', bg: 'bg-red-500/10 border border-red-500/20', icon: 'close', dot: 'bg-red-400' }
+    case 'waiting':
+      return { label: 'Open', sublabel: 'Waiting for user to submit', color: 'text-blue-400', bg: 'bg-blue-500/10 border border-blue-500/20', icon: 'clock', dot: 'bg-blue-400' }
     default:
-      return { label: 'Waiting', color: 'text-gray-400', bg: 'bg-charcoal-500/30 border border-charcoal-400/10', icon: 'clock', dot: 'bg-gray-400' }
+      return { label: 'Pending', sublabel: 'Waiting for submission', color: 'text-gray-400', bg: 'bg-charcoal-500/30 border border-charcoal-400/10', icon: 'clock', dot: 'bg-gray-400' }
   }
 }
 
@@ -315,16 +323,18 @@ function AdminDashboard() {
                       )}
                     </div>
                     <p className="text-gray-600 text-xs mt-0.5">
-                      {room.user?.name || 'User'} · {room.time_start} – {room.time_end}
+                      {room.user?.name || 'User'} · {(room.time_start || '').slice(0, 5)} – {(room.time_end || '').slice(0, 5)}
                     </p>
                   </div>
                   
                   {/* Right side */}
                   <div className="flex items-center gap-3 flex-shrink-0">
                     {/* Status pill */}
-                    <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${statusConfig.bg}`}>
-                      <Icon name={statusConfig.icon} className={`w-3 h-3 ${statusConfig.color}`} />
-                      <span className={`text-xs font-medium ${statusConfig.color}`}>{statusConfig.label}</span>
+                    <div className={`hidden sm:flex flex-col items-end gap-0.5 px-2.5 py-1 rounded-lg ${statusConfig.bg}`} title={statusConfig.sublabel}>
+                      <div className="flex items-center gap-1.5">
+                        <Icon name={statusConfig.icon} className={`w-3 h-3 ${statusConfig.color}`} />
+                        <span className={`text-xs font-medium ${statusConfig.color}`}>{statusConfig.label}</span>
+                      </div>
                     </div>
                     
                     {/* Mobile status dot */}

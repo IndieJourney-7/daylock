@@ -138,7 +138,7 @@ function Dashboard() {
                 
                 <div>
                   <h2 className="text-2xl md:text-3xl font-bold text-accent">{activeRoom.name}</h2>
-                  <p className="text-gray-400 text-sm md:text-base">{activeRoom.time_start} - {activeRoom.time_end}</p>
+                  <p className="text-gray-400 text-sm md:text-base">{roomsService.getTimeWindow(activeRoom)}</p>
                   <p className="text-gray-500 text-xs md:text-sm mt-1">Room is open now!</p>
                 </div>
               </div>
@@ -207,7 +207,7 @@ function Dashboard() {
                         {room.emoji} {room.name}
                       </p>
                       <p className="text-gray-500 text-xs truncate">
-                        {room.time_start} - {room.time_end}
+                        {roomsService.getTimeWindow(room)}
                       </p>
                     </div>
                   </div>

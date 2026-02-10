@@ -20,20 +20,25 @@ const FILTER_OPTIONS = [
 // Status config
 const getStatusConfig = (todayProof, room) => {
   if (room?.is_paused) {
-    return { label: 'Paused', color: 'text-orange-400', bg: 'bg-orange-500/10 border border-orange-500/20', icon: 'pause', dot: 'bg-orange-400' }
+    return { label: 'Paused', sublabel: 'Room paused', color: 'text-orange-400', bg: 'bg-orange-500/10 border border-orange-500/20', icon: 'pause', dot: 'bg-orange-400' }
   }
   if (!todayProof) {
-    return { label: 'Waiting', color: 'text-gray-400', bg: 'bg-charcoal-500/30 border border-charcoal-400/10', icon: 'clock', dot: 'bg-gray-400' }
+    const isOpen = roomsService.isRoomOpen(room)
+    if (isOpen) {
+      return { label: 'Open', sublabel: 'Waiting for submission', color: 'text-blue-400', bg: 'bg-blue-500/10 border border-blue-500/20', icon: 'clock', dot: 'bg-blue-400' }
+    } else {
+      return { label: 'No Proof', sublabel: 'Missed today', color: 'text-gray-400', bg: 'bg-charcoal-500/30 border border-charcoal-400/10', icon: 'clock', dot: 'bg-gray-400' }
+    }
   }
   switch (todayProof.status) {
     case 'approved':
-      return { label: 'Done', color: 'text-accent', bg: 'bg-accent/10 border border-accent/20', icon: 'check', dot: 'bg-accent' }
+      return { label: 'Done', sublabel: 'Approved', color: 'text-accent', bg: 'bg-accent/10 border border-accent/20', icon: 'check', dot: 'bg-accent' }
     case 'pending_review':
-      return { label: 'Review', color: 'text-yellow-400', bg: 'bg-yellow-500/10 border border-yellow-500/20', icon: 'camera', dot: 'bg-yellow-400' }
+      return { label: 'Review', sublabel: 'Needs approval', color: 'text-yellow-400', bg: 'bg-yellow-500/10 border border-yellow-500/20', icon: 'camera', dot: 'bg-yellow-400' }
     case 'rejected':
-      return { label: 'Rejected', color: 'text-red-400', bg: 'bg-red-500/10 border border-red-500/20', icon: 'close', dot: 'bg-red-400' }
+      return { label: 'Rejected', sublabel: 'Awaiting resubmit', color: 'text-red-400', bg: 'bg-red-500/10 border border-red-500/20', icon: 'close', dot: 'bg-red-400' }
     default:
-      return { label: 'Waiting', color: 'text-gray-400', bg: 'bg-charcoal-500/30 border border-charcoal-400/10', icon: 'clock', dot: 'bg-gray-400' }
+      return { label: 'Pending', sublabel: 'Waiting', color: 'text-gray-400', bg: 'bg-charcoal-500/30 border border-charcoal-400/10', icon: 'clock', dot: 'bg-gray-400' }
   }
 }
 
@@ -197,7 +202,7 @@ function AdminRooms() {
                       {room.allow_late_upload && <Badge variant="info" size="sm">Late OK</Badge>}
                     </div>
                     <p className="text-gray-600 text-xs mt-0.5">
-                      {room.user?.name || 'User'} · {room.time_start} – {room.time_end}
+                      {room.user?.name || 'User'} · {roomsService.getTimeWindow(room)}
                     </p>
                   </div>
                   
