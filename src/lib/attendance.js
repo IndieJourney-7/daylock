@@ -12,29 +12,50 @@ export const attendanceService = {
    * Uploads image to Supabase Storage, then submits to backend
    */
   async submitProof(roomId, userId, proofFile, note = '') {
+    // Validate required params
+    if (!roomId) {
+      throw new Error('Room ID is required')
+    }
+    if (!userId) {
+      throw new Error('User ID is required. Please log in again.')
+    }
+    
     let proofUrl = null
     
     // Upload proof image to Supabase Storage
     if (proofFile) {
       const today = new Date().toISOString().split('T')[0]
-      const fileExt = proofFile.name.split('.').pop()
+      const fileExt = proofFile.name?.split('.').pop() || 'jpg'
       const fileName = `${userId}/${roomId}/${today}.${fileExt}`
       
-      const { error: uploadError } = await supabase.storage
+      console.log('Uploading proof to:', fileName)
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('proofs')
         .upload(fileName, proofFile, { upsert: true })
       
-      if (uploadError) throw uploadError
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError)
+        throw new Error(`Failed to upload image: ${uploadError.message}`)
+      }
+      
+      console.log('Upload successful:', uploadData)
       
       // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      const { data: urlData } = supabase.storage
         .from('proofs')
         .getPublicUrl(fileName)
       
-      proofUrl = publicUrl
+      proofUrl = urlData?.publicUrl
+      console.log('Proof URL:', proofUrl)
+      
+      if (!proofUrl) {
+        throw new Error('Failed to get image URL after upload')
+      }
     }
     
     // Submit to backend API
+    console.log('Submitting to backend:', { room_id: roomId, proof_url: proofUrl, note })
     return api.attendance.submit({
       room_id: roomId,
       proof_url: proofUrl,

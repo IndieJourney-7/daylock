@@ -7,6 +7,7 @@
 import { useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Badge, Button, Icon } from '../components/ui'
+import { EditRoomModal, DeleteRoomModal } from '../components/modals'
 import { DAYS, MONTHS } from '../constants'
 import { useRoom, useAttendance } from '../hooks'
 import { useAuth } from '../contexts'
@@ -70,6 +71,12 @@ function RoomDetail() {
   const [previewUrl, setPreviewUrl] = useState(null)
   const [note, setNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
+  
+  // Edit/Delete modal state
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [currentRoom, setCurrentRoom] = useState(null)
   
   if (loading) {
     return <RoomDetailSkeleton />
@@ -155,6 +162,7 @@ function RoomDetail() {
       setSelectedFile(file)
       const url = URL.createObjectURL(file)
       setPreviewUrl(url)
+      setSubmitError(null) // Clear any previous error
     }
   }
   
@@ -175,16 +183,31 @@ function RoomDetail() {
   const handleSubmit = async () => {
     if (!selectedFile || !isOpen) return
     setIsSubmitting(true)
+    setSubmitError(null)
     try {
       await submitProof(selectedFile, note)
       clearFile()
       setNote('')
     } catch (err) {
       console.error('Failed to submit proof:', err)
+      setSubmitError(err.message || 'Failed to submit proof. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
   }
+  
+  // Handle room update from edit modal
+  const handleRoomUpdated = (updatedRoom) => {
+    setCurrentRoom(updatedRoom)
+  }
+  
+  // Handle room deletion
+  const handleRoomDeleted = () => {
+    navigate('/rooms')
+  }
+  
+  // Get the display room (updated locally or from server)
+  const displayRoom = currentRoom || room
   
   // Get attendance status styling for calendar day
   const getAttendanceStyle = (day) => {
@@ -221,18 +244,36 @@ function RoomDetail() {
             w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center text-2xl sm:text-3xl flex-shrink-0
             ${isOpen ? 'bg-accent/20' : 'bg-charcoal-500/50'}
           `}>
-            {room.emoji}
+            {displayRoom.emoji}
           </div>
           <div>
             <h1 className={`text-xl sm:text-2xl font-bold ${isOpen ? 'text-accent' : 'text-white'}`}>
-              {room.name}
+              {displayRoom.name}
             </h1>
             <p className="text-gray-400 text-sm">{timeWindow}</p>
           </div>
         </div>
-        <Badge variant={isOpen ? 'open' : 'locked'} size="lg">
-          {isOpen ? 'open' : 'locked'}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {/* Edit button */}
+          <button
+            onClick={() => setShowEditModal(true)}
+            className="p-2 rounded-lg bg-charcoal-500/50 hover:bg-charcoal-500 border border-charcoal-400/20 transition-colors"
+            title="Edit room"
+          >
+            <Icon name="edit" className="w-4 h-4 text-gray-400" />
+          </button>
+          {/* Delete button */}
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-colors"
+            title="Delete room"
+          >
+            <Icon name="x" className="w-4 h-4 text-red-400" />
+          </button>
+          <Badge variant={isOpen ? 'open' : 'locked'} size="lg">
+            {isOpen ? 'open' : 'locked'}
+          </Badge>
+        </div>
       </div>
       
       {/* Quick Stats */}
@@ -528,6 +569,16 @@ function RoomDetail() {
           />
         </div>
         
+        {/* Error message */}
+        {submitError && (
+          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+            <p className="text-red-400 text-sm flex items-center gap-2">
+              <Icon name="x" className="w-4 h-4" />
+              {submitError}
+            </p>
+          </div>
+        )}
+        
         {/* Submit button */}
         <Button 
           size="full" 
@@ -552,6 +603,22 @@ function RoomDetail() {
         )}
       </Card>
       )}
+      
+      {/* Edit Room Modal */}
+      <EditRoomModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        room={displayRoom}
+        onRoomUpdated={handleRoomUpdated}
+      />
+      
+      {/* Delete Room Modal */}
+      <DeleteRoomModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        room={displayRoom}
+        onRoomDeleted={handleRoomDeleted}
+      />
     </div>
   )
 }
