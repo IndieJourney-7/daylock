@@ -3,8 +3,12 @@
 -- Run this in Supabase SQL Editor after creating the bucket in Dashboard
 -- =====================================================
 
--- STEP 1: Create the 'proofs' bucket in Supabase Dashboard > Storage
--- Make sure to set it as a PUBLIC bucket for getPublicUrl to work
+-- STEP 1: Create the 'proofs' bucket
+-- NOTE: This must be done in Supabase Dashboard > Storage > New Bucket
+-- OR run this INSERT (only works if you have admin access):
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('proofs', 'proofs', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
 
 -- STEP 2: Run the policies below
 
