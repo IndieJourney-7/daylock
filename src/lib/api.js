@@ -167,6 +167,10 @@ export const api = {
     reject: (attendanceId, reason) => request(`/api/attendance/${attendanceId}/reject`, {
       method: 'POST',
       body: JSON.stringify({ reason })
+    }),
+    markAbsent: (roomId, userId, date) => request('/api/attendance/mark-absent', {
+      method: 'POST',
+      body: JSON.stringify({ room_id: roomId, user_id: userId, date })
     })
   },
   

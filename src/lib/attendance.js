@@ -117,6 +117,13 @@ export const attendanceService = {
    */
   async getRoomStats(roomId) {
     return api.attendance.getRoomStats(roomId)
+  },
+
+  /**
+   * Mark user as absent for a date (admin action)
+   */
+  async markAbsent(roomId, userId, date) {
+    return api.attendance.markAbsent(roomId, userId, date)
   }
 }
 

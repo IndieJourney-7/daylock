@@ -55,6 +55,8 @@ function AdminRoomDetail() {
   const [rejectReason, setRejectReason] = useState('')
   const [attendanceHistory, setAttendanceHistory] = useState([])
   const [lightboxImage, setLightboxImage] = useState(null)
+  const [absentDate, setAbsentDate] = useState(new Date().toISOString().split('T')[0])
+  const [isMarkingAbsent, setIsMarkingAbsent] = useState(false)
   
   // Hooks
   const { rules, loading: rulesLoading, addRule: addRuleToDb, toggleRule: toggleRuleInDb, deleteRule: deleteRuleFromDb } = useRoomRules(roomId)
@@ -133,6 +135,38 @@ function AdminRoomDetail() {
       setRoom(prev => ({ ...prev, allow_late_upload: updated.allow_late_upload }))
     } catch (err) { console.error('Toggle late upload failed:', err) }
     finally { setIsTogglingLate(false) }
+  }
+  
+  const handleMarkAbsent = async () => {
+    if (!room || !absentDate) return
+    const userId = room.user_id || room.assignedBy?.id || room.user?.id
+    if (!userId) return
+    
+    // Check if there's already a record for this date
+    const existingEntry = attendanceHistory.find(a => a.date === absentDate)
+    if (existingEntry && (existingEntry.status === 'approved' || existingEntry.status === 'pending_review')) {
+      alert(`Cannot mark absent — user already has a "${existingEntry.status}" entry for ${absentDate}`)
+      return
+    }
+    
+    setIsMarkingAbsent(true)
+    try {
+      const result = await attendanceService.markAbsent(roomId, userId, absentDate)
+      // Update local history
+      setAttendanceHistory(prev => {
+        const existing = prev.findIndex(a => a.date === absentDate)
+        if (existing >= 0) {
+          const updated = [...prev]
+          updated[existing] = { ...updated[existing], ...result }
+          return updated
+        }
+        return [result, ...prev].sort((a, b) => new Date(b.date) - new Date(a.date))
+      })
+    } catch (err) { 
+      console.error('Mark absent failed:', err) 
+      alert('Failed to mark absent: ' + err.message)
+    }
+    finally { setIsMarkingAbsent(false) }
   }
   
   const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -586,6 +620,59 @@ function AdminRoomDetail() {
       {/* ========== HISTORY TAB ========== */}
       {activeTab === 'history' && (
         <div className="space-y-4">
+          {/* Mark Absent Section */}
+          <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                <Icon name="close" className="w-4 h-4 text-red-400" />
+              </div>
+              <div>
+                <p className="text-white text-sm font-medium">Mark Absent</p>
+                <p className="text-gray-500 text-[10px]">Mark {userName.split(' ')[0]} as absent if they didn't submit proof</p>
+              </div>
+            </div>
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="block text-gray-500 text-xs mb-1.5">Date</label>
+                <input
+                  type="date"
+                  value={absentDate}
+                  onChange={(e) => setAbsentDate(e.target.value)}
+                  max={new Date().toISOString().split('T')[0]}
+                  className="w-full px-3 py-2 rounded-lg bg-charcoal-500/30 border border-charcoal-400/10 text-white text-sm focus:outline-none focus:border-red-500/30"
+                />
+              </div>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleMarkAbsent}
+                disabled={isMarkingAbsent || !absentDate}
+              >
+                <span className="flex items-center gap-1.5">
+                  {isMarkingAbsent ? (
+                    <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Icon name="close" className="w-3.5 h-3.5" />
+                  )}
+                  {isMarkingAbsent ? 'Marking...' : 'Mark Absent'}
+                </span>
+              </Button>
+            </div>
+            {/* Quick: show if selected date already has an entry */}
+            {absentDate && attendanceHistory.find(a => a.date === absentDate) && (
+              <p className="text-xs mt-2 text-gray-400">
+                {(() => {
+                  const entry = attendanceHistory.find(a => a.date === absentDate)
+                  if (entry.status === 'missed') return '⚠ Already marked as absent for this date'
+                  if (entry.status === 'approved') return '✓ User has an approved entry for this date'
+                  if (entry.status === 'pending_review') return '⏳ Proof is pending review for this date'
+                  if (entry.status === 'rejected') return '✗ Entry was rejected — can overwrite with absent'
+                  return `Status: ${entry.status}`
+                })()}
+              </p>
+            )}
+          </div>
+
           {/* Stats bar */}
           <div className="grid grid-cols-4 gap-2">
             <div className="p-2.5 rounded-xl bg-charcoal-500/20 border border-charcoal-400/10 text-center">
