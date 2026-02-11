@@ -85,7 +85,10 @@ export const roomsService = {
    * This runs on frontend - no API call needed
    */
   isRoomOpen(room) {
-    if (!room?.time_start || !room?.time_end) return false
+    if (!room?.time_start || !room?.time_end) {
+      console.log(`[isRoomOpen] ${room?.name}: No times set (start=${room?.time_start}, end=${room?.time_end})`)
+      return false
+    }
     
     // Handle PostgreSQL TIME format (HH:MM:SS) by taking first 5 chars
     const roomStart = room.time_start.slice(0, 5) // "08:30:00" -> "08:30"
@@ -94,7 +97,19 @@ export const roomsService = {
     const now = new Date()
     const currentTime = now.toTimeString().slice(0, 5) // HH:MM format
     
-    return currentTime >= roomStart && currentTime <= roomEnd
+    let isOpen = false
+    
+    // Handle overnight windows (e.g., 23:00 → 00:30)
+    if (roomStart > roomEnd) {
+      // Window crosses midnight: open if AFTER start OR BEFORE end
+      isOpen = currentTime >= roomStart || currentTime <= roomEnd
+    } else {
+      // Normal same-day window
+      isOpen = currentTime >= roomStart && currentTime <= roomEnd
+    }
+    
+    console.log(`[isRoomOpen] ${room?.name}: start=${roomStart}, end=${roomEnd}, now=${currentTime}, crossMidnight=${roomStart > roomEnd}, isOpen=${isOpen}`)
+    return isOpen
   },
 
   /**
