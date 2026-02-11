@@ -8,5 +8,7 @@ export {
   useRoomInvites,
   useAdminRooms,
   usePendingProofs,
-  useAllPendingProofs
+  useAllPendingProofs,
+  useGalleryRooms,
+  useGalleryRoomPhotos
 } from './useData'

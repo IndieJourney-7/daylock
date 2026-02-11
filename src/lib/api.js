@@ -212,6 +212,27 @@ export const api = {
     userRoom: (roomId) => request(`/api/analytics/user/room/${roomId}`),
     admin: () => request('/api/analytics/admin'),
     adminUser: (userId) => request(`/api/analytics/admin/user/${userId}`)
+  },
+
+  // Gallery
+  gallery: {
+    getRooms: () => request('/api/gallery'),
+    getRoomPhotos: (roomId, options = {}) => {
+      const params = new URLSearchParams()
+      if (options.fromDate) params.set('fromDate', options.fromDate)
+      if (options.toDate) params.set('toDate', options.toDate)
+      if (options.limit) params.set('limit', options.limit)
+      const query = params.toString()
+      return request(`/api/gallery/room/${roomId}${query ? `?${query}` : ''}`)
+    },
+    getAllPhotos: (options = {}) => {
+      const params = new URLSearchParams()
+      if (options.fromDate) params.set('fromDate', options.fromDate)
+      if (options.toDate) params.set('toDate', options.toDate)
+      if (options.limit) params.set('limit', options.limit)
+      const query = params.toString()
+      return request(`/api/gallery/all${query ? `?${query}` : ''}`)
+    }
   }
 }
 

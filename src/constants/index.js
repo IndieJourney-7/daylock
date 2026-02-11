@@ -24,6 +24,7 @@ export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'home' },
   { id: 'rooms', label: 'Rooms', path: '/rooms', icon: 'rooms' },
   { id: 'analytics', label: 'Analytics', path: '/analytics', icon: 'chart' },
+  { id: 'gallery', label: 'Gallery', path: '/gallery', icon: 'gallery' },
   { id: 'history', label: 'History', path: '/history', icon: 'history' },
   { id: 'profile', label: 'Profile', path: '/profile', icon: 'profile' },
   { id: 'settings', label: 'Settings', path: '/settings', icon: 'settings' },

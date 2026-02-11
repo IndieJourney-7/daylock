@@ -8,7 +8,8 @@ import {
   roomsService, 
   invitesService, 
   attendanceService, 
-  rulesService 
+  rulesService,
+  galleryService
 } from '../lib'
 
 // Generic fetch hook
@@ -321,6 +322,30 @@ export function useAllPendingProofs(adminId) {
   }
 }
 
+// ============ GALLERY HOOKS ============
+
+/**
+ * Fetch gallery rooms (rooms with approved proof photos)
+ */
+export function useGalleryRooms(userId) {
+  return useFetch(
+    () => galleryService.getGalleryRooms(),
+    [userId],
+    !!userId
+  )
+}
+
+/**
+ * Fetch photos for a specific room in gallery
+ */
+export function useGalleryRoomPhotos(roomId, userId) {
+  return useFetch(
+    () => galleryService.getRoomPhotos(roomId),
+    [roomId],
+    !!roomId && !!userId
+  )
+}
+
 export default {
   useRooms,
   useRoom,
@@ -330,5 +355,7 @@ export default {
   useRoomInvites,
   useAdminRooms,
   usePendingProofs,
-  useAllPendingProofs
+  useAllPendingProofs,
+  useGalleryRooms,
+  useGalleryRoomPhotos
 }

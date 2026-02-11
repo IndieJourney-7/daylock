@@ -37,6 +37,7 @@ import {
   AdminUserAnalytics 
 } from './pages/admin'
 import Analytics from './pages/Analytics'
+import Gallery from './pages/Gallery'
 
 // Landing Page Component
 function LandingPage() {
@@ -77,6 +78,7 @@ function App() {
           <Route path="/rooms/attendance" element={<AttendanceRoom />} />
           <Route path="/rooms/:roomId" element={<RoomDetail />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/gallery" element={<Gallery />} />
           <Route path="/history" element={<History />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
