@@ -146,133 +146,265 @@ function Lightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext }) {
 }
 
 /* ═══════════════════════════════════════════════════
-   COLLAGE GENERATOR — export room photos as collage
+   COLLAGE GENERATOR — export room photos as sheet/collage
+   Shows ALL proof photos in a journal-style grid
    ═══════════════════════════════════════════════════ */
 
-function CollageModal({ photos, roomName, roomEmoji, onClose }) {
-  const canvasRef = useRef(null)
-  const [generating, setGenerating] = useState(false)
-  const [collageReady, setCollageReady] = useState(false)
-  const [layout, setLayout] = useState('grid') // grid | timeline
+// Utility: load an image with CORS
+function loadImage(url) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
 
-  const generateCollage = useCallback(async () => {
-    if (!photos.length) return
-    setGenerating(true)
-    setCollageReady(false)
+// Utility: draw a single collage page to a canvas
+async function renderCollagePage({
+  canvas, photos, cols, pageIndex, totalPages, roomName, roomEmoji, totalPhotoCount
+}) {
+  const ctx = canvas.getContext('2d')
 
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
-    
-    // Determine grid size
-    const count = Math.min(photos.length, 20) // max 20 photos in collage
-    const cols = count <= 4 ? 2 : count <= 9 ? 3 : 4
-    const rows = Math.ceil(count / cols)
-    
-    const cellSize = 280
-    const gap = 8
-    const headerHeight = 100
-    const footerHeight = 60
-    const padding = 24
+  const cellSize = 240
+  const dateBarHeight = 32
+  const cellTotal = cellSize + dateBarHeight
+  const gap = 10
+  const rows = Math.ceil(photos.length / cols)
+  const headerHeight = 90
+  const footerHeight = 50
+  const padding = 28
 
-    canvas.width = cols * cellSize + (cols - 1) * gap + padding * 2
-    canvas.height = headerHeight + rows * cellSize + (rows - 1) * gap + footerHeight + padding * 2
+  canvas.width  = cols * cellSize + (cols - 1) * gap + padding * 2
+  canvas.height = headerHeight + rows * cellTotal + (rows - 1) * gap + footerHeight + padding * 2
 
-    // Background
-    ctx.fillStyle = '#111827'
-    ctx.roundRect(0, 0, canvas.width, canvas.height, 16)
-    ctx.fill()
+  // Background
+  ctx.fillStyle = '#0f172a'
+  ctx.beginPath()
+  ctx.roundRect(0, 0, canvas.width, canvas.height, 16)
+  ctx.fill()
 
-    // Header
-    ctx.fillStyle = '#ffffff'
-    ctx.font = 'bold 32px system-ui, -apple-system, sans-serif'
-    ctx.fillText(`${roomEmoji} ${roomName}`, padding, padding + 40)
-    
-    ctx.fillStyle = '#9ca3af'
-    ctx.font = '16px system-ui, -apple-system, sans-serif'
-    ctx.fillText(`${photos.length} approved proofs · DayLock Journey`, padding, padding + 68)
+  // Header — accent bar
+  ctx.fillStyle = '#3b82f6'
+  ctx.fillRect(padding, padding, 50, 4)
 
-    // Load and draw images
-    const selectedPhotos = photos.slice(0, count)
-    
-    const loadImage = (url) => new Promise((resolve) => {
-      const img = new Image()
-      img.crossOrigin = 'anonymous'
-      img.onload = () => resolve(img)
-      img.onerror = () => resolve(null)
-      img.src = url
-    })
+  // Header — title
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 26px system-ui, -apple-system, sans-serif'
+  ctx.fillText(`${roomEmoji}  ${roomName}`, padding, padding + 36)
 
-    const images = await Promise.all(selectedPhotos.map(p => loadImage(p.proof_url)))
+  // Header — subtitle
+  ctx.fillStyle = '#94a3b8'
+  ctx.font = '14px system-ui, -apple-system, sans-serif'
+  const dateRange = photos.length
+    ? `${formatDate(photos[photos.length - 1].date)} — ${formatDate(photos[0].date)}`
+    : ''
+  const pageLabel = totalPages > 1 ? `  ·  Page ${pageIndex + 1} of ${totalPages}` : ''
+  ctx.fillText(
+    `${totalPhotoCount} proof${totalPhotoCount !== 1 ? 's' : ''} of work  ·  ${dateRange}${pageLabel}`,
+    padding, padding + 60
+  )
 
-    for (let i = 0; i < images.length; i++) {
-      const img = images[i]
-      if (!img) continue
-      
-      const col = i % cols
-      const row = Math.floor(i / cols)
-      const x = padding + col * (cellSize + gap)
-      const y = headerHeight + padding + row * (cellSize + gap)
+  // Load all images for this page
+  const images = await Promise.all(photos.map(p => loadImage(p.proof_url)))
 
-      // Draw rounded rect clip
-      ctx.save()
-      ctx.beginPath()
-      ctx.roundRect(x, y, cellSize, cellSize, 12)
-      ctx.clip()
+  for (let i = 0; i < photos.length; i++) {
+    const img = images[i]
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    const x = padding + col * (cellSize + gap)
+    const y = headerHeight + padding + row * (cellTotal + gap)
 
-      // Draw image (cover fit)
+    // Photo cell
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(x, y, cellSize, cellSize, 10)
+    ctx.clip()
+
+    if (img) {
       const scale = Math.max(cellSize / img.width, cellSize / img.height)
       const w = img.width * scale
       const h = img.height * scale
       ctx.drawImage(img, x - (w - cellSize) / 2, y - (h - cellSize) / 2, w, h)
-
-      // Date overlay
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'
-      ctx.fillRect(x, y + cellSize - 36, cellSize, 36)
-      ctx.fillStyle = '#ffffff'
-      ctx.font = '12px system-ui, -apple-system, sans-serif'
-      ctx.fillText(formatDate(selectedPhotos[i].date), x + 8, y + cellSize - 12)
-
-      ctx.restore()
+    } else {
+      ctx.fillStyle = '#1e293b'
+      ctx.fillRect(x, y, cellSize, cellSize)
+      ctx.fillStyle = '#475569'
+      ctx.font = '13px system-ui'
+      ctx.textAlign = 'center'
+      ctx.fillText('Photo unavailable', x + cellSize / 2, y + cellSize / 2)
+      ctx.textAlign = 'start'
     }
+    ctx.restore()
 
-    // Footer
-    const footerY = canvas.height - footerHeight + 10
-    ctx.fillStyle = '#6b7280'
-    ctx.font = '13px system-ui, -apple-system, sans-serif'
-    ctx.fillText(`Generated on ${new Date().toLocaleDateString()} · DayLock — Lock Your Day`, padding, footerY + 20)
+    // Date label bar below photo
+    ctx.fillStyle = '#1e293b'
+    ctx.beginPath()
+    ctx.roundRect(x, y + cellSize + 2, cellSize, dateBarHeight - 2, [0, 0, 8, 8])
+    ctx.fill()
 
-    // Accent line
-    ctx.fillStyle = '#3b82f6'
-    ctx.fillRect(padding, footerY - 5, 60, 3)
+    ctx.fillStyle = '#e2e8f0'
+    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif'
+    ctx.fillText(formatDate(photos[i].date), x + 8, y + cellSize + 20)
+
+    // Day number badge
+    const dayNum = `Day ${totalPhotoCount - (pageIndex * (cols * Math.ceil(photos.length / cols)) + i)}`
+    ctx.fillStyle = '#64748b'
+    ctx.font = '10px system-ui'
+    const dayW = ctx.measureText(dayNum).width
+    ctx.fillText(dayNum, x + cellSize - dayW - 8, y + cellSize + 19)
+  }
+
+  // Footer
+  const footerY = canvas.height - footerHeight + 8
+  ctx.fillStyle = '#3b82f6'
+  ctx.fillRect(padding, footerY - 4, 40, 3)
+  ctx.fillStyle = '#64748b'
+  ctx.font = '12px system-ui, -apple-system, sans-serif'
+  ctx.fillText(
+    `Generated ${new Date().toLocaleDateString()}  ·  DayLock — Lock Your Day`,
+    padding, footerY + 16
+  )
+
+  return canvas
+}
+
+function CollageModal({ photos, roomName, roomEmoji, onClose }) {
+  const previewCanvasRef = useRef(null)
+  const [generating, setGenerating] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [collageReady, setCollageReady] = useState(false)
+  const [currentPage, setCurrentPage] = useState(0)
+  const [cols, setCols] = useState(photos.length <= 9 ? 3 : 4)
+
+  const ROWS_PER_PAGE = 5
+  const photosPerPage = cols * ROWS_PER_PAGE
+  const totalPages = Math.ceil(photos.length / photosPerPage)
+
+  const getPagePhotos = useCallback(
+    (page) => photos.slice(page * photosPerPage, (page + 1) * photosPerPage),
+    [photos, photosPerPage]
+  )
+
+  // Render preview for current page
+  const renderPreview = useCallback(async () => {
+    if (!photos.length || !previewCanvasRef.current) return
+    setGenerating(true)
+    setCollageReady(false)
+
+    await renderCollagePage({
+      canvas: previewCanvasRef.current,
+      photos: getPagePhotos(currentPage),
+      cols,
+      pageIndex: currentPage,
+      totalPages,
+      roomName,
+      roomEmoji,
+      totalPhotoCount: photos.length,
+    })
 
     setGenerating(false)
     setCollageReady(true)
-  }, [photos, roomName, roomEmoji, layout])
+  }, [photos, cols, currentPage, totalPages, roomName, roomEmoji, getPagePhotos])
 
   useEffect(() => {
-    generateCollage()
-  }, [generateCollage])
+    renderPreview()
+  }, [renderPreview])
 
-  const downloadCollage = () => {
-    const canvas = canvasRef.current
+  // Download FULL collage as multi-page PDF
+  const downloadPDF = useCallback(async () => {
+    setExporting(true)
+    setProgress(0)
+
+    try {
+      const { default: jsPDF } = await import('jspdf')
+
+      // Render first page to get dimensions
+      const tempCanvas = document.createElement('canvas')
+      await renderCollagePage({
+        canvas: tempCanvas,
+        photos: getPagePhotos(0),
+        cols,
+        pageIndex: 0,
+        totalPages,
+        roomName,
+        roomEmoji,
+        totalPhotoCount: photos.length,
+      })
+
+      const pxW = tempCanvas.width
+      const pxH = tempCanvas.height
+      // Convert pixels to mm (assume 96 DPI) — scale so width fits A4-like page
+      const pageWidthMM = 210
+      const scale = pageWidthMM / pxW
+      const pageHeightMM = pxH * scale
+
+      const doc = new jsPDF({
+        orientation: pageWidthMM > pageHeightMM ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: [pageWidthMM, pageHeightMM],
+      })
+
+      for (let p = 0; p < totalPages; p++) {
+        if (p > 0) {
+          // Render page canvas
+          const pageCanvas = document.createElement('canvas')
+          await renderCollagePage({
+            canvas: pageCanvas,
+            photos: getPagePhotos(p),
+            cols,
+            pageIndex: p,
+            totalPages,
+            roomName,
+            roomEmoji,
+            totalPhotoCount: photos.length,
+          })
+          const imgData = pageCanvas.toDataURL('image/jpeg', 0.92)
+          // Pages may differ in height
+          const pH = pageCanvas.height * scale
+          doc.addPage([pageWidthMM, pH])
+          doc.addImage(imgData, 'JPEG', 0, 0, pageWidthMM, pH)
+        } else {
+          const imgData = tempCanvas.toDataURL('image/jpeg', 0.92)
+          doc.addImage(imgData, 'JPEG', 0, 0, pageWidthMM, pageHeightMM)
+        }
+        setProgress(Math.round(((p + 1) / totalPages) * 100))
+      }
+
+      doc.save(`daylock-${roomName.toLowerCase().replace(/\s+/g, '-')}-collage.pdf`)
+    } catch (err) {
+      console.error('PDF export error:', err)
+    } finally {
+      setExporting(false)
+      setProgress(0)
+    }
+  }, [photos, cols, totalPages, roomName, roomEmoji, getPagePhotos])
+
+  // Download current page as PNG
+  const downloadPNG = () => {
+    const canvas = previewCanvasRef.current
+    if (!canvas) return
     const link = document.createElement('a')
-    link.download = `daylock-${roomName.toLowerCase().replace(/\s+/g, '-')}-collage.png`
+    link.download = `daylock-${roomName.toLowerCase().replace(/\s+/g, '-')}-page${currentPage + 1}.png`
     link.href = canvas.toDataURL('image/png')
     link.click()
   }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-charcoal-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-charcoal-400/20">
+      <div className="bg-charcoal-800 rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto border border-charcoal-400/20">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-charcoal-400/10">
           <div>
-            <h3 className="text-white font-bold text-lg">Export Collage</h3>
+            <h3 className="text-white font-bold text-lg">Export Proof-of-Work Sheet</h3>
             <p className="text-gray-500 text-sm">
               {roomEmoji} {roomName} · {photos.length} photos
+              {totalPages > 1 && ` · ${totalPages} pages`}
             </p>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-charcoal-600/50 text-gray-400 hover:text-white transition-colors"
           >
@@ -280,28 +412,101 @@ function CollageModal({ photos, roomName, roomEmoji, onClose }) {
           </button>
         </div>
 
-        {/* Canvas Preview */}
-        <div className="p-5 flex justify-center">
-          <canvas 
-            ref={canvasRef} 
-            className="max-w-full rounded-xl shadow-2xl border border-charcoal-400/10"
-            style={{ maxHeight: '60vh', objectFit: 'contain' }}
-          />
+        {/* Options bar */}
+        <div className="px-5 py-3 border-b border-charcoal-400/10 flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-sm">Columns:</span>
+            {[3, 4, 5].map(n => (
+              <button
+                key={n}
+                onClick={() => { setCols(n); setCurrentPage(0) }}
+                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                  cols === n
+                    ? 'bg-accent text-white'
+                    : 'bg-charcoal-600/50 text-gray-400 hover:text-white'
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <div className="text-gray-600 text-sm">|</div>
+          <span className="text-gray-400 text-sm">
+            {photosPerPage} photos per page · {totalPages} page{totalPages !== 1 ? 's' : ''}
+          </span>
         </div>
 
+        {/* Canvas Preview */}
+        <div className="p-5 flex justify-center">
+          {generating && !collageReady ? (
+            <div className="flex flex-col items-center py-16 gap-3">
+              <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              <p className="text-gray-400 text-sm">Rendering page…</p>
+            </div>
+          ) : (
+            <canvas
+              ref={previewCanvasRef}
+              className="max-w-full rounded-xl shadow-2xl border border-charcoal-400/10"
+              style={{ maxHeight: '55vh', objectFit: 'contain' }}
+            />
+          )}
+        </div>
+
+        {/* Page navigation */}
+        {totalPages > 1 && (
+          <div className="px-5 pb-2 flex items-center justify-center gap-3">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+              disabled={currentPage === 0}
+              className="p-2 rounded-lg bg-charcoal-600/50 text-gray-400 hover:text-white disabled:opacity-30 transition-colors"
+            >
+              <Icon name="chevronLeft" className="w-4 h-4" />
+            </button>
+            <span className="text-white text-sm font-medium">
+              Page {currentPage + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={currentPage === totalPages - 1}
+              className="p-2 rounded-lg bg-charcoal-600/50 text-gray-400 hover:text-white disabled:opacity-30 transition-colors"
+            >
+              <Icon name="chevronRight" className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Actions */}
-        <div className="p-5 border-t border-charcoal-400/10 flex items-center justify-between">
+        <div className="p-5 border-t border-charcoal-400/10 flex items-center justify-between flex-wrap gap-3">
           <p className="text-gray-500 text-sm">
-            {generating ? 'Generating collage...' : `${Math.min(photos.length, 20)} photos in collage`}
+            {exporting
+              ? `Exporting… ${progress}%`
+              : `${photos.length} total proofs · preview page ${currentPage + 1}`}
           </p>
           <div className="flex gap-3">
             <Button variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button 
-              onClick={downloadCollage} 
-              disabled={!collageReady || generating}
+            <Button
+              variant="secondary"
+              onClick={downloadPNG}
+              disabled={!collageReady || exporting}
             >
               <Icon name="download" className="w-4 h-4 mr-2" />
-              Download PNG
+              Page PNG
+            </Button>
+            <Button
+              onClick={downloadPDF}
+              disabled={exporting}
+            >
+              {exporting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Exporting…
+                </>
+              ) : (
+                <>
+                  <Icon name="download" className="w-4 h-4 mr-2" />
+                  Download Full PDF
+                </>
+              )}
             </Button>
           </div>
         </div>
