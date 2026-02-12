@@ -20,14 +20,13 @@ function Sidebar() {
   return (
     <aside className="hidden md:flex flex-col w-56 bg-charcoal-800 border-r border-charcoal-400/10 min-h-screen">
       {/* Logo */}
-      <div className="p-5 border-b border-charcoal-400/10">
-        <div className="flex items-center gap-3">
+      <div className="p-4 border-b border-charcoal-400/10">
+        <div className="flex items-center">
           <img 
             src="/Assets/daylock_logo.png" 
             alt="Daylock" 
-            className="w-8 h-8 object-contain"
+            className="w-32 h-32 object-contain -my-10"
           />
-          <span className="text-white font-bold text-lg">Daylock</span>
         </div>
       </div>
       

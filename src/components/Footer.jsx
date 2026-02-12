@@ -7,13 +7,12 @@ function Footer() {
         <div className="grid sm:grid-cols-3 gap-8 mb-12">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-2 mb-4">
               <img 
                 src="/Assets/daylock_logo.png" 
                 alt="Daylock Logo" 
-                className="w-10 h-10 object-contain"
+                className="w-36 h-36 object-contain -my-12"
               />
-              <span className="text-white font-bold text-lg">Daylock</span>
             </div>
             <p className="text-gray-500 text-sm leading-relaxed">
               Your Day. Locked.<br />

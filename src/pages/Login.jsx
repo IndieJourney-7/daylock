@@ -59,10 +59,11 @@ function Login() {
       {/* Header */}
       <header className="p-4">
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
-            <span className="text-charcoal-900 font-bold text-sm">D</span>
-          </div>
-          <span className="text-white font-semibold">Daylock</span>
+          <img 
+            src="/Assets/daylock_logo.png" 
+            alt="Daylock" 
+            className="w-32 h-32 object-contain -my-10"
+          />
         </Link>
       </header>
       

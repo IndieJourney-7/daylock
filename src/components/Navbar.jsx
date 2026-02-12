@@ -15,7 +15,7 @@ function Navbar() {
             <img 
               src="/Assets/daylock_logo.png" 
               alt="Daylock Logo" 
-              className="w-36 h-36 object-contain"
+              className="w-44 h-44 object-contain -my-14"
             />
           </a>
           

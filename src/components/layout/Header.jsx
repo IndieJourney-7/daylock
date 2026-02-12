@@ -34,7 +34,7 @@ function Header({ title, showBack = false, onBack, rightAction }) {
             <img 
               src="/Assets/daylock_logo.png" 
               alt="Daylock" 
-              className="w-7 h-7 object-contain"
+              className="w-24 h-24 object-contain -my-6"
             />
           )}
           <h1 className="text-white font-semibold text-lg">{displayTitle}</h1>

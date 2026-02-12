@@ -26,10 +26,12 @@ function AdminLayout() {
           </button>
           
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center">
-              <span className="text-accent text-sm font-bold">A</span>
-            </div>
-            <span className="text-white font-semibold text-sm">Admin Panel</span>
+            <img 
+              src="/Assets/daylock_logo.png" 
+              alt="Daylock" 
+              className="w-24 h-24 object-contain -my-6"
+            />
+            <span className="text-gray-400 text-xs font-medium">Admin</span>
           </div>
           
           <button 
@@ -44,15 +46,14 @@ function AdminLayout() {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-64 bg-charcoal-800 border-r border-charcoal-400/10 flex-col z-50">
         {/* Logo */}
-        <div className="p-6 border-b border-charcoal-400/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
-              <span className="text-accent text-lg font-bold">A</span>
-            </div>
-            <div>
-              <span className="text-white font-bold text-lg">Daylock</span>
-              <p className="text-gray-500 text-xs">Admin Panel</p>
-            </div>
+        <div className="p-5 border-b border-charcoal-400/10">
+          <div className="flex items-center gap-2">
+            <img 
+              src="/Assets/daylock_logo.png" 
+              alt="Daylock" 
+              className="w-32 h-32 object-contain -my-10"
+            />
+            <span className="text-gray-400 text-xs font-medium mt-0.5">Admin</span>
           </div>
         </div>
         
@@ -107,12 +108,14 @@ function AdminLayout() {
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         {/* Logo */}
-        <div className="p-6 border-b border-charcoal-400/10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
-              <span className="text-accent text-lg font-bold">A</span>
-            </div>
-            <span className="text-white font-bold text-lg">Admin</span>
+        <div className="p-5 border-b border-charcoal-400/10 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img 
+              src="/Assets/daylock_logo.png" 
+              alt="Daylock" 
+              className="w-28 h-28 object-contain -my-8"
+            />
+            <span className="text-gray-400 text-xs font-medium">Admin</span>
           </div>
           <button 
             onClick={() => setSidebarOpen(false)}
