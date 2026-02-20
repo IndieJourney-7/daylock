@@ -2,14 +2,25 @@
  * Attendance Room Page
  * End-of-day summary - review all rooms and reflect on daily performance
  * This aggregates real data from all user's rooms
+ * 
+ * Phase 1: Pressure System Integration
+ * - Streak identity with progress
+ * - Discipline score with breakdown
+ * - Dynamic summary messages
  */
 
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Badge, Button, Icon } from '../components/ui'
+import { 
+  StreakIdentity, 
+  DisciplineScore, 
+  DynamicMessage 
+} from '../components/pressure'
 import { useAuth } from '../contexts'
 import { useRooms, useUserHistory } from '../hooks'
 import { roomsService, attendanceService } from '../lib'
+import { calculateStreak, getStreakPhase, detectMisses } from '../lib/pressure'
 
 // Status styling helper
 const getStatusConfig = (status) => {
@@ -138,34 +149,26 @@ function AttendanceRoom() {
   const totalRooms = roomSummaries.length
   const completionRate = totalRooms > 0 ? Math.round((submittedRooms / totalRooms) * 100) : 0
 
-  // Calculate overall streak from history
-  const overallStreak = useMemo(() => {
-    if (!history?.length) return 0
-    // Group by date, check if all rooms had at least one submission per day
-    const dateMap = {}
-    history.forEach(record => {
-      if (record.status === 'approved') {
-        dateMap[record.date] = (dateMap[record.date] || 0) + 1
-      }
-    })
-    const dates = Object.keys(dateMap).sort((a, b) => new Date(b) - new Date(a))
-    let streak = 0
-    let checkDate = new Date()
-    checkDate.setHours(0, 0, 0, 0)
-    
-    for (const dateStr of dates) {
-      const d = new Date(dateStr)
-      d.setHours(0, 0, 0, 0)
-      const diff = Math.floor((checkDate - d) / (1000 * 60 * 60 * 24))
-      if (diff <= 1) {
-        streak++
-        checkDate = d
-      } else {
-        break
-      }
-    }
-    return streak
-  }, [history])
+  // Calculate overall streak from history using pressure system
+  const streakData = useMemo(() => calculateStreak(history || []), [history])
+  const overallStreak = streakData.current
+  const phase = getStreakPhase(overallStreak)
+
+  // Phase 1: Miss detection for dynamic messages
+  const missData = useMemo(() => {
+    return detectMisses(roomSummaries.map(r => ({ ...r, todayStatus: r.todayStatus })))
+  }, [roomSummaries])
+
+  // Phase 1: Dynamic message context
+  const messageContext = useMemo(() => ({
+    isOpen: roomSummaries.some(r => r.isOpen),
+    hasSubmitted: submittedRooms > 0,
+    streak: overallStreak,
+    lastStreak: streakData.lastStreak,
+    allComplete: submittedRooms === totalRooms && totalRooms > 0,
+    hasMissedRecently: missData.hasMissedToday,
+    phase,
+  }), [roomSummaries, submittedRooms, totalRooms, overallStreak, streakData.lastStreak, missData.hasMissedToday, phase])
 
   // Weekly progress from history
   const weeklyProgress = useMemo(() => {
@@ -245,6 +248,9 @@ function AttendanceRoom() {
         <span>{todayStr}</span>
       </div>
       
+      {/* Phase 1: Dynamic Pressure Message */}
+      <DynamicMessage context={messageContext} />
+
       {/* Daily Stats Overview */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="text-center py-4">
@@ -257,12 +263,24 @@ function AttendanceRoom() {
         </Card>
         <Card className="text-center py-4">
           <div className="flex items-center justify-center gap-1">
-            <Icon name="fire" className="w-5 h-5 text-orange-400" />
-            <span className="text-2xl font-bold text-orange-400">{overallStreak}</span>
+            <span className="text-sm">{phase.emoji}</span>
+            <span className={`text-2xl font-bold ${phase.color}`}>{overallStreak}</span>
           </div>
-          <div className="text-xs text-gray-500 mt-1">Day Streak</div>
+          <div className="text-xs text-gray-500 mt-1">{phase.label}</div>
         </Card>
       </div>
+
+      {/* Phase 1: Streak Identity Card */}
+      {overallStreak > 0 && (
+        <StreakIdentity streak={overallStreak} showProgress={true} />
+      )}
+
+      {/* Phase 1: Discipline Score */}
+      <DisciplineScore 
+        attendanceRecords={history || []} 
+        streak={overallStreak} 
+        showBreakdown={true}
+      />
       
       {/* Today's Room Summary */}
       <Card>
@@ -424,11 +442,11 @@ function AttendanceRoom() {
         
         {overallStreak > 0 ? (
           <p className="text-gray-500 text-xs text-center mt-4">
-            🔥 {overallStreak} day streak! Keep it going!
+            {phase.emoji} {phase.label} — {overallStreak} day streak! Keep pushing.
           </p>
         ) : (
           <p className="text-gray-500 text-xs text-center mt-4">
-            Submit proofs to start building your streak!
+            Submit proofs to start building your streak and earn discipline points!
           </p>
         )}
       </Card>

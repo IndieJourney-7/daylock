@@ -79,9 +79,11 @@ export const attendanceService = {
 
   /**
    * Get user's attendance for a specific room
+   * @param {string} roomId
+   * @param {string} [userId] - Optional: pass when admin needs another user's attendance
    */
-  async getUserAttendance(roomId) {
-    return api.attendance.getForRoom(roomId)
+  async getUserAttendance(roomId, userId) {
+    return api.attendance.getForRoom(roomId, userId)
   },
 
   /**

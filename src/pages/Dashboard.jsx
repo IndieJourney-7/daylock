@@ -2,13 +2,32 @@
  * Dashboard Page (Home)
  * Shows today's overview and active room
  * Answers: "What should I be doing right now?"
+ * 
+ * Phase 1: Core Pressure System
+ * - Countdown urgency timer on active room
+ * - Streak identity badge
+ * - Dynamic pressure messages
+ * - Discipline score overview
+ * - Miss confrontation trigger
  */
 
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Badge, Button, Icon } from '../components/ui'
+import { 
+  CountdownTimer, CountdownBadge, 
+  StreakIdentity, StreakBadge,
+  DynamicMessage,
+  DisciplineScoreBadge,
+  MissConfrontation 
+} from '../components/pressure'
 import { useAuth } from '../contexts'
-import { useRooms } from '../hooks'
+import { useRooms, useUserHistory } from '../hooks'
 import { roomsService } from '../lib'
+import { 
+  getRoomCountdown, getStreakPhase, calculateStreak, 
+  calculateDisciplinePoints, detectMisses 
+} from '../lib/pressure'
 
 // Progress Ring Component
 function ProgressRing({ progress = 75, size = 48, strokeWidth = 4 }) {
@@ -64,7 +83,9 @@ function DashboardSkeleton() {
 
 function Dashboard() {
   const { user, profile } = useAuth()
-  const { data: rooms, loading, error } = useRooms(user?.id)
+  const { data: rooms, loading: roomsLoading, error } = useRooms(user?.id)
+  const { data: history, loading: historyLoading } = useUserHistory(user?.id)
+  const [showConfrontation, setShowConfrontation] = useState(true)
   
   const today = new Date()
   const dayName = today.toLocaleDateString('en-US', { weekday: 'long' })
@@ -73,18 +94,54 @@ function Dashboard() {
   const userName = profile?.name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'there'
   
   // Calculate room open/locked status based on current time
-  const roomsWithStatus = (rooms || []).map(room => ({
-    ...room,
-    status: roomsService.isRoomOpen(room) ? 'open' : 'locked'
-  }))
+  const roomsWithStatus = (rooms || []).map(room => {
+    const countdown = getRoomCountdown(room)
+    return {
+      ...room,
+      status: roomsService.isRoomOpen(room) ? 'open' : 'locked',
+      countdown,
+    }
+  })
   
   const activeRoom = roomsWithStatus.find(r => r.status === 'open')
   const completedRooms = roomsWithStatus.filter(r => r.todayCompleted).length
   const totalRooms = roomsWithStatus.length
   const progress = totalRooms > 0 ? Math.round((completedRooms / totalRooms) * 100) : 0
   
-  // Calculate streak (would come from aggregated data)
-  const streak = profile?.streak || 0
+  // Phase 1: Calculate streak from history
+  const streakData = useMemo(() => calculateStreak(history || []), [history])
+  const streak = streakData.current
+  const phase = getStreakPhase(streak)
+
+  // Phase 1: Discipline points
+  const disciplineData = useMemo(
+    () => calculateDisciplinePoints(history || [], streak),
+    [history, streak]
+  )
+
+  // Phase 1: Miss detection
+  const missData = useMemo(() => {
+    const summaries = roomsWithStatus.map(r => ({
+      ...r,
+      todayStatus: r.todayCompleted ? 'approved' : (r.status === 'locked' ? 'missed' : 'waiting')
+    }))
+    return detectMisses(summaries)
+  }, [roomsWithStatus])
+
+  // Phase 1: Dynamic message context
+  const messageContext = useMemo(() => ({
+    isOpen: !!activeRoom,
+    hasSubmitted: completedRooms > 0,
+    streak,
+    lastStreak: streakData.lastStreak,
+    urgencyLevel: activeRoom?.countdown?.urgencyLevel || 'low',
+    countdown: activeRoom?.countdown?.timeRemaining || '',
+    allComplete: completedRooms === totalRooms && totalRooms > 0,
+    hasMissedRecently: missData.hasMissedToday,
+    phase,
+  }), [activeRoom, completedRooms, totalRooms, streak, streakData.lastStreak, missData.hasMissedToday, phase])
+
+  const loading = roomsLoading || historyLoading
   
   if (loading) {
     return <DashboardSkeleton />
@@ -102,6 +159,16 @@ function Dashboard() {
   
   return (
     <div className="max-w-4xl mx-auto space-y-5 md:space-y-6">
+      {/* Phase 1: Miss Confrontation Overlay */}
+      {missData.hasMissedToday && showConfrontation && (
+        <MissConfrontation 
+          missedRooms={missData.missedRooms}
+          streak={streak}
+          lastStreak={streakData.lastStreak}
+          onAcknowledge={() => setShowConfrontation(false)}
+        />
+      )}
+
       {/* Greeting & Date Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -111,16 +178,27 @@ function Dashboard() {
           <p className="text-gray-400 text-sm mt-1">
             {dayName} • {completedRooms}/{totalRooms} rooms completed
           </p>
-          <div className="flex items-center gap-2 mt-1">
-            <Icon name="fire" className="w-4 h-4 text-accent" />
-            <span className="text-accent text-sm font-medium">Streak • {streak} Days</span>
+          {/* Phase 1: Streak Identity Badge */}
+          <div className="flex items-center gap-2 mt-1.5">
+            <StreakBadge streak={streak} />
+            <DisciplineScoreBadge attendanceRecords={history || []} streak={streak} />
           </div>
         </div>
         
         {/* Progress Ring */}
         <ProgressRing progress={progress} size={48} strokeWidth={4} />
       </div>
+
+      {/* Phase 1: Dynamic Pressure Message */}
+      {totalRooms > 0 && (
+        <DynamicMessage context={messageContext} />
+      )}
       
+      {/* Phase 1: Streak Identity Card (only if streak > 0) */}
+      {streak > 0 && (
+        <StreakIdentity streak={streak} showProgress={true} />
+      )}
+
       {/* Active Room Card */}
       {activeRoom && (
         <Link to={`/rooms/${activeRoom.id}`}>
@@ -139,7 +217,10 @@ function Dashboard() {
                 <div>
                   <h2 className="text-2xl md:text-3xl font-bold text-accent">{activeRoom.name}</h2>
                   <p className="text-gray-400 text-sm md:text-base">{roomsService.getTimeWindow(activeRoom)}</p>
-                  <p className="text-gray-500 text-xs md:text-sm mt-1">Room is open now!</p>
+                  {/* Phase 1: Countdown Timer */}
+                  <div className="mt-2">
+                    <CountdownTimer room={activeRoom} size="sm" />
+                  </div>
                 </div>
               </div>
               
@@ -152,11 +233,27 @@ function Dashboard() {
       )}
       
       {/* No Active Room State */}
-      {!activeRoom && (
+      {!activeRoom && totalRooms > 0 && (
         <Card className="text-center py-8">
           <Icon name="lock" className="w-12 h-12 text-gray-500 mx-auto mb-3" />
           <h3 className="text-white font-semibold mb-1">No Room Open</h3>
-          <p className="text-gray-500 text-sm">Next room opens at 9:00 AM</p>
+          {/* Phase 1: Show countdown to nearest room opening */}
+          {(() => {
+            const nextRoom = roomsWithStatus
+              .filter(r => r.status === 'locked' && r.countdown?.totalSeconds > 0)
+              .sort((a, b) => a.countdown.totalSeconds - b.countdown.totalSeconds)[0]
+            if (nextRoom) {
+              return (
+                <div className="mt-2">
+                  <p className="text-gray-500 text-sm mb-2">
+                    {nextRoom.emoji} {nextRoom.name} opens next
+                  </p>
+                  <CountdownBadge room={nextRoom} />
+                </div>
+              )
+            }
+            return <p className="text-gray-500 text-sm">All rooms closed for today</p>
+          })()}
         </Card>
       )}
       
@@ -193,27 +290,33 @@ function Dashboard() {
             {roomsWithStatus.map((room) => (
               <Link key={room.id} to={`/rooms/${room.id}`}>
                 <Card 
-                  className={`flex items-center justify-between h-full transition-all duration-200 hover:border-charcoal-300/30 ${
+                  className={`flex flex-col h-full transition-all duration-200 hover:border-charcoal-300/30 ${
                     room.status === 'locked' ? 'opacity-80' : ''
                   }`}
                   padding="p-3 md:p-4"
                 >
-                  <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                    {room.status === 'locked' && (
-                      <Icon name="lock" className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-white font-medium text-sm md:text-base truncate">
-                        {room.emoji} {room.name}
-                      </p>
-                      <p className="text-gray-500 text-xs truncate">
-                        {roomsService.getTimeWindow(room)}
-                      </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                      {room.status === 'locked' && (
+                        <Icon name="lock" className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-white font-medium text-sm md:text-base truncate">
+                          {room.emoji} {room.name}
+                        </p>
+                        <p className="text-gray-500 text-xs truncate">
+                          {roomsService.getTimeWindow(room)}
+                        </p>
+                      </div>
                     </div>
+                    <Badge variant={room.status === 'open' ? 'open' : 'locked'} size="sm">
+                      {room.status}
+                    </Badge>
                   </div>
-                  <Badge variant={room.status === 'open' ? 'open' : 'locked'} size="sm">
-                    {room.status}
-                  </Badge>
+                  {/* Phase 1: Countdown badge on each room card */}
+                  <div className="mt-2">
+                    <CountdownBadge room={room} />
+                  </div>
                 </Card>
               </Link>
             ))}

@@ -90,8 +90,8 @@ export function useRooms(userId) {
  */
 export function useRoom(roomId, userId) {
   return useFetch(
-    () => roomsService.getRoomWithStats(roomId),
-    [roomId],
+    () => roomsService.getRoomWithStats(roomId, userId),
+    [roomId, userId],
     !!roomId && !!userId
   )
 }

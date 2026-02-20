@@ -152,7 +152,12 @@ export const api = {
       const query = params.toString()
       return request(`/api/attendance${query ? `?${query}` : ''}`)
     },
-    getForRoom: (roomId) => request(`/api/attendance/room/${roomId}`),
+    getForRoom: (roomId, userId) => {
+      const params = new URLSearchParams()
+      if (userId) params.set('userId', userId)
+      const query = params.toString()
+      return request(`/api/attendance/room/${roomId}${query ? `?${query}` : ''}`)
+    },
     getTodayStatus: (roomId) => request(`/api/attendance/room/${roomId}/today`),
     getRoomStats: (roomId) => request(`/api/attendance/room/${roomId}/stats`),
     submit: (data) => request('/api/attendance/submit', {

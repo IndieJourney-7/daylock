@@ -102,11 +102,11 @@ function AdminRoomDetail() {
   }
   
   const handleApprove = async (proofId) => {
-    try { await approve(proofId, user.id); setSelectedProof(null) } catch (err) { console.error('Approve failed:', err) }
+    try { await approve(proofId); setSelectedProof(null) } catch (err) { console.error('Approve failed:', err) }
   }
   
   const handleReject = async (proofId) => {
-    try { await reject(proofId, user.id, rejectReason); setSelectedProof(null); setRejectReason('') } catch (err) { console.error('Reject failed:', err) }
+    try { await reject(proofId, rejectReason); setSelectedProof(null); setRejectReason('') } catch (err) { console.error('Reject failed:', err) }
   }
   
   const handleSaveTime = async () => {

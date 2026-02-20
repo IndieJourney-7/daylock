@@ -10,7 +10,7 @@ import { Card, Badge, Icon, Button } from '../components/ui'
 import { CreateRoomModal, InviteAdminModal } from '../components/modals'
 import { useAuth } from '../contexts'
 import { useRooms, useRoomInvites } from '../hooks'
-import { roomsService } from '../lib'
+import { roomsService, api } from '../lib'
 
 // Loading skeleton
 function RoomsSkeleton() {
@@ -54,7 +54,8 @@ function Rooms() {
   
   const handleCreateRoom = async (roomData) => {
     try {
-      const result = await roomsService.createRoom(roomData)
+      // Use API (not direct Supabase) — backend auto-creates invite code
+      const result = await api.rooms.create(roomData)
       // Don't refetch() here — it causes loading=true which unmounts the modal.
       // We refetch when the modal closes instead.
       return result

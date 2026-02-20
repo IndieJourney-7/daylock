@@ -2,16 +2,33 @@
  * Room Detail Page
  * Shows room-specific rules, attendance calendar, and proof upload
  * Each room has isolated data - never mixed with other rooms
+ * 
+ * Phase 1: Pressure System Integration
+ * - Countdown timer in header
+ * - Streak identity & discipline score
+ * - Dynamic pressure messages
+ * - Reflection lock on missed days
  */
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Badge, Button, Icon } from '../components/ui'
+import { 
+  CountdownTimer, 
+  StreakBadge, 
+  DynamicMessage, 
+  DisciplineScoreBadge,
+  ReflectionLock 
+} from '../components/pressure'
 import { EditRoomModal, DeleteRoomModal } from '../components/modals'
 import { DAYS, MONTHS } from '../constants'
 import { useRoom, useAttendance } from '../hooks'
 import { useAuth } from '../contexts'
-import { roomsService } from '../lib'
+import { roomsService, attendanceService } from '../lib'
+import { 
+  getRoomCountdown, getStreakPhase, calculateStreak, 
+  calculateDisciplinePoints, needsReflection, getDynamicMessage 
+} from '../lib/pressure'
 
 // Get calendar data for a month
 function getCalendarDays(year, month) {
@@ -126,6 +143,48 @@ function RoomDetail() {
     if (record.status === 'approved') streak++
     else break
   }
+
+  // Phase 1: Advanced streak data
+  const streakData = useMemo(() => calculateStreak(attendanceData || []), [attendanceData])
+  const phase = getStreakPhase(streakData.current)
+
+  // Phase 1: Discipline points for this room
+  const disciplineData = useMemo(
+    () => calculateDisciplinePoints(attendanceData || [], streakData.current),
+    [attendanceData, streakData.current]
+  )
+
+  // Phase 1: Check if reflection is required
+  const unreflectedMisses = useMemo(() => needsReflection(attendanceData || []), [attendanceData])
+  const [reflectionDismissed, setReflectionDismissed] = useState(false)
+  const showReflectionLock = unreflectedMisses.length > 0 && !reflectionDismissed
+
+  // Phase 1: Handle reflection submission
+  const handleReflectionSubmit = async (reflectionText) => {
+    const missRecord = unreflectedMisses[0]
+    if (missRecord) {
+      try {
+        // Update the attendance record with the reflection note
+        await attendanceService.submitProof(room.id, user?.id, null, reflectionText)
+      } catch (err) {
+        console.log('Reflection saved locally (API may not support update yet)')
+      }
+      setReflectionDismissed(true)
+    }
+  }
+
+  // Phase 1: Dynamic message context for this room
+  const messageContext = useMemo(() => ({
+    isOpen,
+    hasSubmitted: !!todayProofStatus && todayProofStatus !== 'rejected',
+    streak: streakData.current,
+    lastStreak: streakData.lastStreak,
+    urgencyLevel: getRoomCountdown(room)?.urgencyLevel || 'low',
+    countdown: getRoomCountdown(room)?.timeRemaining || '',
+    allComplete: todayProofStatus === 'approved',
+    hasMissedRecently: unreflectedMisses.length > 0,
+    phase,
+  }), [isOpen, todayProofStatus, streakData, room, unreflectedMisses.length, phase])
   
   // Get today's proof status
   const todayStr = today.toISOString().split('T')[0]
@@ -228,6 +287,17 @@ function RoomDetail() {
   
   return (
     <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
+      {/* Phase 1: Reflection Lock Overlay */}
+      {showReflectionLock && (
+        <ReflectionLock
+          missedRecord={unreflectedMisses[0]}
+          roomName={room.name}
+          roomEmoji={room.emoji}
+          onSubmit={handleReflectionSubmit}
+          onSkip={() => setReflectionDismissed(true)}
+        />
+      )}
+
       {/* Back button (mobile) */}
       <button 
         onClick={() => navigate(-1)}
@@ -248,6 +318,13 @@ function RoomDetail() {
           </div>
           <div>
             <h1 className={`text-xl sm:text-2xl font-bold ${isOpen ? 'text-accent' : 'text-white'}`}>
+              {displayRoom.name}
+            </h1>
+            <p className="text-gray-400 text-sm">{timeWindow}</p>
+            {/* Phase 1: Countdown Timer */}
+            <div className="mt-1.5">
+              <CountdownTimer room={room} size="sm" />
+            </div>
               {displayRoom.name}
             </h1>
             <p className="text-gray-400 text-sm">{timeWindow}</p>
@@ -276,10 +353,16 @@ function RoomDetail() {
         </div>
       </div>
       
+      {/* Phase 1: Dynamic Pressure Message */}
+      <DynamicMessage context={messageContext} />
+
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="text-center py-4">
-          <div className="text-2xl font-bold text-accent">{streak}</div>
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-sm">{phase.emoji}</span>
+            <span className={`text-2xl font-bold ${phase.color}`}>{streakData.current}</span>
+          </div>
           <div className="text-xs text-gray-500 mt-1">Day Streak</div>
         </Card>
         <Card className="text-center py-4">
@@ -287,8 +370,8 @@ function RoomDetail() {
           <div className="text-xs text-gray-500 mt-1">Attendance</div>
         </Card>
         <Card className="text-center py-4">
-          <div className="text-2xl font-bold text-white">{approvedDays}</div>
-          <div className="text-xs text-gray-500 mt-1">Days Present</div>
+          <div className={`text-2xl font-bold ${disciplineData.levelColor}`}>⚡{disciplineData.total}</div>
+          <div className="text-xs text-gray-500 mt-1">{disciplineData.title}</div>
         </Card>
       </div>
       

@@ -46,3 +46,30 @@ export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ]
+
+// ============================================================
+// PRESSURE SYSTEM CONSTANTS (Phase 1)
+// ============================================================
+
+// Streak milestone thresholds that trigger celebrations
+export const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100, 200, 365]
+
+// Discipline point values (mirror of pressure.js for reference)
+export const DISCIPLINE_POINTS = {
+  APPROVED: 10,
+  STREAK_BONUS: 2,
+  ON_TIME_BONUS: 3,
+  MISSED: -15,
+  REJECTED: -5,
+  REFLECTION: 5,
+}
+
+// Minimum reflection length (characters)
+export const MIN_REFLECTION_LENGTH = 20
+
+// Urgency thresholds (seconds)
+export const URGENCY_THRESHOLDS = {
+  CRITICAL: 300,   // 5 minutes
+  HIGH: 900,       // 15 minutes
+  MEDIUM: 1800,    // 30 minutes
+}
