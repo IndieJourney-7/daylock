@@ -9,7 +9,8 @@ import {
   invitesService, 
   attendanceService, 
   rulesService,
-  galleryService
+  galleryService,
+  warningsService
 } from '../lib'
 
 // Generic fetch hook
@@ -272,13 +273,13 @@ export function usePendingProofs(roomId) {
     !!roomId
   )
 
-  const approve = async (attendanceId) => {
-    await attendanceService.approveAttendance(attendanceId)
+  const approve = async (attendanceId, options = {}) => {
+    await attendanceService.approveAttendance(attendanceId, options)
     refetch()
   }
 
-  const reject = async (attendanceId, reason) => {
-    await attendanceService.rejectAttendance(attendanceId, reason)
+  const reject = async (attendanceId, reason, options = {}) => {
+    await attendanceService.rejectAttendance(attendanceId, reason, options)
     refetch()
   }
 
@@ -346,6 +347,67 @@ export function useGalleryRoomPhotos(roomId, userId) {
   )
 }
 
+// ============ WARNING & CONSEQUENCE HOOKS ============
+
+/**
+ * Fetch all active warnings for admin
+ */
+export function useAdminWarnings(adminId) {
+  return useFetch(
+    () => warningsService.getAdminWarnings(),
+    [adminId],
+    !!adminId
+  )
+}
+
+/**
+ * Fetch warnings for a specific room
+ */
+export function useRoomWarnings(roomId) {
+  const { data, loading, error, refetch, setData } = useFetch(
+    () => warningsService.getRoomWarnings(roomId),
+    [roomId],
+    !!roomId
+  )
+
+  const dismiss = async (warningId) => {
+    await warningsService.dismissWarning(warningId)
+    setData(prev => (prev || []).map(w => w.id === warningId ? { ...w, active: false } : w))
+  }
+
+  return {
+    warnings: data || [],
+    loading,
+    error,
+    refetch,
+    dismiss
+  }
+}
+
+/**
+ * Fetch consequences for a specific room
+ */
+export function useRoomConsequences(roomId) {
+  const { data, loading, error, refetch, setData } = useFetch(
+    () => warningsService.getConsequences(roomId),
+    [roomId],
+    !!roomId
+  )
+
+  const resolve = async (consequenceId) => {
+    await warningsService.resolveConsequence(consequenceId)
+    setData(prev => (prev || []).map(c => c.id === consequenceId ? { ...c, active: false, resolved_at: new Date().toISOString() } : c))
+  }
+
+  return {
+    consequences: data || [],
+    loading,
+    error,
+    refetch,
+    resolve
+  }
+}
+
 export default {
   useRooms,
   useRoom,
@@ -357,5 +419,8 @@ export default {
   usePendingProofs,
   useAllPendingProofs,
   useGalleryRooms,
-  useGalleryRoomPhotos
+  useGalleryRoomPhotos,
+  useAdminWarnings,
+  useRoomWarnings,
+  useRoomConsequences
 }

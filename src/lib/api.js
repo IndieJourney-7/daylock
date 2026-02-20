@@ -166,12 +166,13 @@ export const api = {
     }),
     getPending: () => request('/api/attendance/pending'),
     getPendingForRoom: (roomId) => request(`/api/attendance/pending/${roomId}`),
-    approve: (attendanceId) => request(`/api/attendance/${attendanceId}/approve`, {
-      method: 'POST'
-    }),
-    reject: (attendanceId, reason) => request(`/api/attendance/${attendanceId}/reject`, {
+    approve: (attendanceId, options = {}) => request(`/api/attendance/${attendanceId}/approve`, {
       method: 'POST',
-      body: JSON.stringify({ reason })
+      body: JSON.stringify({ quality_rating: options.quality_rating, admin_feedback: options.admin_feedback })
+    }),
+    reject: (attendanceId, reason, options = {}) => request(`/api/attendance/${attendanceId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, quality_rating: options.quality_rating, admin_feedback: options.admin_feedback })
     }),
     markAbsent: (roomId, userId, date) => request('/api/attendance/mark-absent', {
       method: 'POST',
@@ -242,6 +243,34 @@ export const api = {
       const query = params.toString()
       return request(`/api/gallery/all${query ? `?${query}` : ''}`)
     }
+  },
+
+  // Warnings & Consequences
+  warnings: {
+    getAll: () => request('/api/warnings'),
+    getForRoom: (roomId) => request(`/api/warnings/room/${roomId}`),
+    create: (data) => request('/api/warnings', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+    createAuto: (data) => request('/api/warnings/auto', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+    acknowledge: (warningId) => request(`/api/warnings/${warningId}/acknowledge`, {
+      method: 'POST'
+    }),
+    dismiss: (warningId) => request(`/api/warnings/${warningId}/dismiss`, {
+      method: 'POST'
+    }),
+    getConsequences: (roomId) => request(`/api/warnings/consequences/room/${roomId}`),
+    issueConsequence: (data) => request('/api/warnings/consequences', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+    resolveConsequence: (consequenceId) => request(`/api/warnings/consequences/${consequenceId}/resolve`, {
+      method: 'POST'
+    })
   }
 }
 

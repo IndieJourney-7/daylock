@@ -8,8 +8,9 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, Badge, Icon, Button } from '../../components/ui'
 import { useAuth } from '../../contexts'
-import { useAdminRooms, useAllPendingProofs } from '../../hooks'
+import { useAdminRooms, useAllPendingProofs, useAdminWarnings } from '../../hooks'
 import { roomsService, invitesService } from '../../lib'
+import { WarningAlert } from '../../components/admin'
 
 // Status config helper
 const getStatusConfig = (todayProof, room) => {
@@ -59,6 +60,7 @@ function AdminDashboard() {
   const { user, profile } = useAuth()
   const { data: rooms, loading: roomsLoading, refetch: refetchRooms } = useAdminRooms(user?.id)
   const { proofs, loading: proofsLoading } = useAllPendingProofs(user?.id)
+  const { data: adminWarnings } = useAdminWarnings(user?.id)
   
   // Invite code state
   const [inviteCode, setInviteCode] = useState('')
@@ -101,6 +103,7 @@ function AdminDashboard() {
   
   const assignedRooms = rooms || []
   const pendingProofs = proofs || []
+  const activeWarnings = (adminWarnings || []).filter(w => w.active)
   const uniqueUsers = [...new Set(assignedRooms.map(r => r.user_id))].length
   
   // Today's stats
@@ -242,6 +245,31 @@ function AdminDashboard() {
         </button>
       )}
       
+      {/* Active Warnings Alert */}
+      {activeWarnings.length > 0 && (
+        <button 
+          onClick={() => {
+            const roomWithWarning = activeWarnings[0]?.room_id
+            if (roomWithWarning) navigate(`/admin/rooms/${roomWithWarning}`)
+            else navigate('/admin/rooms')
+          }}
+          className="w-full text-left"
+        >
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-orange-500/5 border border-orange-500/20 hover:bg-orange-500/10 transition-colors">
+            <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+              <Icon name="alertCircle" className="w-5 h-5 text-orange-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-medium text-sm">
+                {activeWarnings.length} active warning{activeWarnings.length > 1 ? 's' : ''}
+              </p>
+              <p className="text-gray-500 text-xs mt-0.5">Users need attention</p>
+            </div>
+            <Icon name="chevronRight" className="w-5 h-5 text-orange-500/50" />
+          </div>
+        </button>
+      )}
+      
       {/* Today's Status Bar */}
       {assignedRooms.length > 0 && (
         <div className="p-4 rounded-xl bg-charcoal-500/20 border border-charcoal-400/10">
@@ -296,6 +324,7 @@ function AdminDashboard() {
             const statusConfig = getStatusConfig(room.today_attendance, room)
             const isOpen = roomsService.isRoomOpen(room)
             const attendanceRate = room.stats?.attendanceRate || 0
+            const roomWarningCount = activeWarnings.filter(w => w.room_id === room.id).length
             
             return (
               <Link key={room.id} to={`/admin/rooms/${room.id}`} className="block group">
@@ -320,6 +349,11 @@ function AdminDashboard() {
                       <h3 className="text-white font-medium text-sm truncate">{room.name}</h3>
                       {room.today_attendance?.status === 'pending_review' && (
                         <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse flex-shrink-0" />
+                      )}
+                      {roomWarningCount > 0 && (
+                        <span className="w-4 h-4 rounded-full bg-orange-500/20 text-orange-400 text-[9px] flex items-center justify-center flex-shrink-0 font-bold">
+                          {roomWarningCount}
+                        </span>
                       )}
                     </div>
                     <p className="text-gray-600 text-xs mt-0.5">

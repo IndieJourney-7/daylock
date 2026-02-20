@@ -10,5 +10,8 @@ export {
   usePendingProofs,
   useAllPendingProofs,
   useGalleryRooms,
-  useGalleryRoomPhotos
+  useGalleryRoomPhotos,
+  useAdminWarnings,
+  useRoomWarnings,
+  useRoomConsequences
 } from './useData'

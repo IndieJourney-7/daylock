@@ -1,21 +1,23 @@
 /**
  * Admin Room Detail
- * Full room management: toggles, proof gallery, rules, time window, history
- * 4 Tabs: Overview, Proofs, Rules, History
+ * Full room management: toggles, proof gallery, rules, time window, history, authority
+ * 5 Tabs: Overview, Proofs, Rules, History, Authority
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Card, Badge, Icon, Button } from '../../components/ui'
 import { useAuth } from '../../contexts'
-import { useRoomRules, usePendingProofs } from '../../hooks'
-import { invitesService, roomsService, attendanceService } from '../../lib'
+import { useRoomRules, usePendingProofs, useRoomWarnings, useRoomConsequences } from '../../hooks'
+import { invitesService, roomsService, attendanceService, warningsService, detectWarnings } from '../../lib'
+import { ProofReviewCard, StarDisplay, WarningBanner, WarningAlert, SendWarningModal, WeeklySummary, ConsequenceTracker } from '../../components/admin'
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: 'grid' },
   { id: 'proofs', label: 'Proofs', icon: 'camera' },
   { id: 'rules', label: 'Rules', icon: 'list' },
   { id: 'history', label: 'History', icon: 'calendar' },
+  { id: 'authority', label: 'Authority', icon: 'shield' },
 ]
 
 // Loading skeleton
@@ -61,6 +63,14 @@ function AdminRoomDetail() {
   // Hooks
   const { rules, loading: rulesLoading, addRule: addRuleToDb, toggleRule: toggleRuleInDb, deleteRule: deleteRuleFromDb } = useRoomRules(roomId)
   const { proofs, loading: proofsLoading, approve, reject, refetch: refetchProofs } = usePendingProofs(roomId)
+  const { warnings: storedWarnings, loading: warningsLoading, refetch: refetchWarnings, dismiss: dismissWarning } = useRoomWarnings(roomId)
+  const { consequences, loading: consequencesLoading, refetch: refetchConsequences, resolve: resolveConsequence } = useRoomConsequences(roomId)
+  
+  // Warning modal state
+  const [showSendWarning, setShowSendWarning] = useState(false)
+  const [warningPrefill, setWarningPrefill] = useState(null)
+  const [isSendingWarning, setIsSendingWarning] = useState(false)
+  const [isIssuingConsequence, setIsIssuingConsequence] = useState(false)
   
   // Fetch room details
   useEffect(() => {
@@ -101,12 +111,12 @@ function AdminRoomDetail() {
     try { await deleteRuleFromDb(ruleId) } catch (err) { console.error('Failed to delete rule:', err) }
   }
   
-  const handleApprove = async (proofId) => {
-    try { await approve(proofId); setSelectedProof(null) } catch (err) { console.error('Approve failed:', err) }
+  const handleApprove = async (proofId, options = {}) => {
+    try { await approve(proofId, options); setSelectedProof(null) } catch (err) { console.error('Approve failed:', err) }
   }
   
-  const handleReject = async (proofId) => {
-    try { await reject(proofId, rejectReason); setSelectedProof(null); setRejectReason('') } catch (err) { console.error('Reject failed:', err) }
+  const handleReject = async (proofId, reason, options = {}) => {
+    try { await reject(proofId, reason || rejectReason, options); setSelectedProof(null); setRejectReason('') } catch (err) { console.error('Reject failed:', err) }
   }
   
   const handleSaveTime = async () => {
@@ -171,6 +181,61 @@ function AdminRoomDetail() {
   
   const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   const formatTime = (dateStr) => dateStr ? new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''
+  
+  // Auto-detected warnings from attendance data
+  const detectedWarnings = useMemo(() => detectWarnings(attendanceHistory), [attendanceHistory])
+  
+  // Warning/consequence handlers
+  const handleSendWarning = (warning) => {
+    setWarningPrefill(warning)
+    setShowSendWarning(true)
+  }
+  
+  const handleConfirmSendWarning = async ({ severity, message }) => {
+    if (!room) return
+    setIsSendingWarning(true)
+    try {
+      const userId = room.user_id || room.assignedBy?.id || room.user?.id
+      await warningsService.createWarning({
+        room_id: roomId,
+        user_id: userId,
+        severity,
+        message
+      })
+      await refetchWarnings()
+      setShowSendWarning(false)
+      setWarningPrefill(null)
+    } catch (err) { console.error('Send warning failed:', err) }
+    finally { setIsSendingWarning(false) }
+  }
+  
+  const handleDismissWarning = async (warning) => {
+    if (warning.id && typeof warning.id === 'string') {
+      try { await dismissWarning(warning.id) } catch (err) { console.error('Dismiss failed:', err) }
+    }
+  }
+  
+  const handleIssueConsequence = async ({ level, reason, notes, expires_at }) => {
+    if (!room) return
+    setIsIssuingConsequence(true)
+    try {
+      const userId = room.user_id || room.assignedBy?.id || room.user?.id
+      await warningsService.issueConsequence({
+        room_id: roomId,
+        user_id: userId,
+        level,
+        reason,
+        notes,
+        expires_at
+      })
+      await refetchConsequences()
+    } catch (err) { console.error('Issue consequence failed:', err) }
+    finally { setIsIssuingConsequence(false) }
+  }
+  
+  const handleResolveConsequence = async (consequenceId) => {
+    try { await resolveConsequence(consequenceId) } catch (err) { console.error('Resolve failed:', err) }
+  }
   
   if (loading || rulesLoading) return <DetailSkeleton />
   
@@ -287,6 +352,11 @@ function AdminRoomDetail() {
                 {proofs.length}
               </span>
             )}
+            {tab.id === 'authority' && (detectedWarnings.length + storedWarnings.filter(w => w.active).length) > 0 && (
+              <span className="w-4 h-4 rounded-full bg-orange-500 text-white text-[10px] flex items-center justify-center font-bold">
+                {detectedWarnings.length + storedWarnings.filter(w => w.active).length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -313,6 +383,21 @@ function AdminRoomDetail() {
               <p className="text-gray-500 text-[10px] mt-0.5">Missed</p>
             </div>
           </div>
+          
+          {/* Warning Alerts (Phase 2) */}
+          {(detectedWarnings.length > 0 || storedWarnings.filter(w => w.active).length > 0) && (
+            <div className="p-3 rounded-xl bg-yellow-500/5 border border-yellow-500/15">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Icon name="alertCircle" className="w-4 h-4 text-yellow-400" />
+                  <span className="text-yellow-400 text-xs font-medium">
+                    {detectedWarnings.length + storedWarnings.filter(w => w.active).length} Warning{(detectedWarnings.length + storedWarnings.filter(w => w.active).length) > 1 ? 's' : ''}
+                  </span>
+                </div>
+                <button onClick={() => setActiveTab('authority')} className="text-accent text-xs hover:underline">View All</button>
+              </div>
+            </div>
+          )}
           
           {/* Room Controls */}
           <div className="p-4 rounded-xl bg-charcoal-500/20 border border-charcoal-400/10 space-y-4">
@@ -463,89 +548,16 @@ function AdminRoomDetail() {
               </p>
               
               {proofs.map((proof) => (
-                <div key={proof.id} className="p-4 rounded-xl bg-charcoal-500/20 border border-yellow-500/15 space-y-4">
-                  {/* Header */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white font-medium text-sm">{formatDate(proof.date)}</p>
-                      <p className="text-gray-500 text-xs">Uploaded {formatTime(proof.submitted_at)}</p>
-                    </div>
-                    <Badge variant="warning" size="sm">Pending</Badge>
-                  </div>
-                  
-                  {/* Proof Image */}
-                  {proof.proof_url ? (
-                    <button 
-                      onClick={() => setLightboxImage(proof.proof_url)}
-                      className="w-full aspect-video rounded-xl overflow-hidden bg-charcoal-500/30 hover:opacity-90 transition-opacity"
-                    >
-                      <img src={proof.proof_url} alt="Proof" className="w-full h-full object-cover" />
-                    </button>
-                  ) : (
-                    <div className="aspect-video rounded-xl bg-charcoal-500/30 border border-charcoal-400/10 flex items-center justify-center">
-                      <div className="text-center">
-                        <Icon name="image" className="w-10 h-10 text-gray-600 mx-auto mb-2" />
-                        <p className="text-gray-500 text-xs">No image</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Note */}
-                  {proof.note && (
-                    <div className="p-3 rounded-lg bg-charcoal-500/30">
-                      <p className="text-gray-400 text-[10px] uppercase tracking-wider mb-1">Note</p>
-                      <p className="text-white text-sm">{proof.note}</p>
-                    </div>
-                  )}
-                  
-                  {/* Rules checklist */}
-                  {rules.filter(r => r.enabled).length > 0 && (
-                    <div className="p-3 rounded-lg bg-charcoal-500/10 border border-charcoal-400/5">
-                      <p className="text-gray-400 text-[10px] uppercase tracking-wider mb-2">Check Against Rules</p>
-                      <div className="space-y-1.5">
-                        {rules.filter(r => r.enabled).map(rule => (
-                          <div key={rule.id} className="flex items-start gap-2">
-                            <div className="w-4 h-4 mt-0.5 rounded border border-gray-500/50 flex items-center justify-center flex-shrink-0">
-                              <Icon name="check" className="w-2.5 h-2.5 text-gray-600" />
-                            </div>
-                            <span className="text-gray-400 text-xs leading-relaxed">{rule.text}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <Button onClick={() => handleApprove(proof.id)} className="flex-1" size="sm">
-                      <span className="flex items-center justify-center gap-1.5">
-                        <Icon name="check" className="w-4 h-4" /> Approve
-                      </span>
-                    </Button>
-                    <Button variant="danger" onClick={() => setSelectedProof(proof.id)} className="flex-1" size="sm">
-                      <span className="flex items-center justify-center gap-1.5">
-                        <Icon name="close" className="w-4 h-4" /> Reject
-                      </span>
-                    </Button>
-                  </div>
-                  
-                  {/* Reject reason */}
-                  {selectedProof === proof.id && (
-                    <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/15 space-y-2">
-                      <input
-                        type="text"
-                        placeholder="Reason (optional)..."
-                        value={rejectReason}
-                        onChange={(e) => setRejectReason(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-charcoal-500/30 border border-charcoal-400/10 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-red-500/30"
-                      />
-                      <div className="flex gap-2">
-                        <Button variant="danger" size="sm" onClick={() => handleReject(proof.id)} className="flex-1">Confirm</Button>
-                        <Button variant="secondary" size="sm" onClick={() => { setSelectedProof(null); setRejectReason('') }}>Cancel</Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <ProofReviewCard
+                  key={proof.id}
+                  proof={proof}
+                  rules={rules}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                  onImageClick={setLightboxImage}
+                  formatDate={formatDate}
+                  formatTime={formatTime}
+                />
               ))}
             </>
           ) : (
@@ -749,6 +761,7 @@ function AdminRoomDetail() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {entry.quality_rating && <StarDisplay rating={entry.quality_rating} />}
                       {entry.proof_url && (
                         <button
                           onClick={() => setLightboxImage(entry.proof_url)}
@@ -778,6 +791,48 @@ function AdminRoomDetail() {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* ========== AUTHORITY TAB ========== */}
+      {activeTab === 'authority' && (
+        <div className="space-y-4">
+          {/* Warnings */}
+          <WarningBanner
+            detectedWarnings={detectedWarnings}
+            storedWarnings={storedWarnings}
+            onDismiss={handleDismissWarning}
+            onSend={handleSendWarning}
+          />
+          
+          {detectedWarnings.length === 0 && storedWarnings.filter(w => w.active).length === 0 && (
+            <div className="p-4 rounded-xl bg-accent/5 border border-accent/10 text-center">
+              <Icon name="check" className="w-8 h-8 text-accent mx-auto mb-2" />
+              <p className="text-white text-sm font-medium">No Active Warnings</p>
+              <p className="text-gray-500 text-xs mt-0.5">{userName} is on track</p>
+            </div>
+          )}
+          
+          {/* Weekly Summary */}
+          <WeeklySummary records={attendanceHistory} />
+          
+          {/* Consequence Tracker */}
+          <ConsequenceTracker
+            consequences={consequences}
+            onIssue={handleIssueConsequence}
+            onResolve={handleResolveConsequence}
+            isLoading={isIssuingConsequence}
+          />
+        </div>
+      )}
+      
+      {/* Send Warning Modal */}
+      {showSendWarning && (
+        <SendWarningModal
+          warning={warningPrefill}
+          onConfirm={handleConfirmSendWarning}
+          onCancel={() => { setShowSendWarning(false); setWarningPrefill(null) }}
+          isLoading={isSendingWarning}
+        />
       )}
     </div>
   )

@@ -66,15 +66,15 @@ export const attendanceService = {
   /**
    * Approve attendance (admin action)
    */
-  async approveAttendance(attendanceId) {
-    return api.attendance.approve(attendanceId)
+  async approveAttendance(attendanceId, options = {}) {
+    return api.attendance.approve(attendanceId, options)
   },
 
   /**
    * Reject attendance (admin action)
    */
-  async rejectAttendance(attendanceId, reason = '') {
-    return api.attendance.reject(attendanceId, reason)
+  async rejectAttendance(attendanceId, reason = '', options = {}) {
+    return api.attendance.reject(attendanceId, reason, options)
   },
 
   /**
