@@ -95,6 +95,49 @@ function RoomDetail() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [currentRoom, setCurrentRoom] = useState(null)
   
+  // ============================================================
+  // ALL hooks MUST be called before any early returns (React rules of hooks)
+  // ============================================================
+
+  // Phase 1: Advanced streak data
+  const streakData = useMemo(() => calculateStreak(attendanceData || []), [attendanceData])
+  const phase = getStreakPhase(streakData.current)
+
+  // Phase 1: Discipline points for this room
+  const disciplineData = useMemo(
+    () => calculateDisciplinePoints(attendanceData || [], streakData.current),
+    [attendanceData, streakData.current]
+  )
+
+  // Phase 1: Check if reflection is required
+  const unreflectedMisses = useMemo(() => needsReflection(attendanceData || []), [attendanceData])
+  const [reflectionDismissed, setReflectionDismissed] = useState(false)
+
+  // Get today's proof status (needed by messageContext below)
+  const todayStr = today.toISOString().split('T')[0]
+  const todayRecord = (attendanceData || []).find(a => a.date === todayStr)
+  const todayProofStatus = todayRecord?.status || null
+
+  // Compute isOpen safely (room may be null while loading)
+  const isOpen = room ? roomsService.isRoomOpen(room) : false
+
+  // Phase 1: Dynamic message context for this room
+  const messageContext = useMemo(() => ({
+    isOpen,
+    hasSubmitted: !!todayProofStatus && todayProofStatus !== 'rejected',
+    streak: streakData.current,
+    lastStreak: streakData.lastStreak,
+    urgencyLevel: room ? (getRoomCountdown(room)?.urgencyLevel || 'low') : 'low',
+    countdown: room ? (getRoomCountdown(room)?.timeRemaining || '') : '',
+    allComplete: todayProofStatus === 'approved',
+    hasMissedRecently: unreflectedMisses.length > 0,
+    phase,
+  }), [isOpen, todayProofStatus, streakData, room, unreflectedMisses.length, phase])
+
+  // ============================================================
+  // Early returns (after all hooks)
+  // ============================================================
+  
   if (loading) {
     return <RoomDetailSkeleton />
   }
@@ -113,8 +156,27 @@ function RoomDetail() {
     )
   }
   
+  // ============================================================
+  // Derived data (safe to compute after early returns — not hooks)
+  // ============================================================
+
+  const showReflectionLock = unreflectedMisses.length > 0 && !reflectionDismissed
+
+  // Phase 1: Handle reflection submission
+  const handleReflectionSubmit = async (reflectionText) => {
+    const missRecord = unreflectedMisses[0]
+    if (missRecord) {
+      try {
+        // Update the attendance record with the reflection note
+        await attendanceService.submitProof(room.id, user?.id, null, reflectionText)
+      } catch (err) {
+        console.log('Reflection saved locally (API may not support update yet)')
+      }
+      setReflectionDismissed(true)
+    }
+  }
+
   // Derive data from room
-  const isOpen = roomsService.isRoomOpen(room)
   const timeWindow = roomsService.getTimeWindow(room)
   const rules = room.room_rules || []
   const admin = room.admin || null
@@ -144,52 +206,6 @@ function RoomDetail() {
     else break
   }
 
-  // Phase 1: Advanced streak data
-  const streakData = useMemo(() => calculateStreak(attendanceData || []), [attendanceData])
-  const phase = getStreakPhase(streakData.current)
-
-  // Phase 1: Discipline points for this room
-  const disciplineData = useMemo(
-    () => calculateDisciplinePoints(attendanceData || [], streakData.current),
-    [attendanceData, streakData.current]
-  )
-
-  // Phase 1: Check if reflection is required
-  const unreflectedMisses = useMemo(() => needsReflection(attendanceData || []), [attendanceData])
-  const [reflectionDismissed, setReflectionDismissed] = useState(false)
-  const showReflectionLock = unreflectedMisses.length > 0 && !reflectionDismissed
-
-  // Phase 1: Handle reflection submission
-  const handleReflectionSubmit = async (reflectionText) => {
-    const missRecord = unreflectedMisses[0]
-    if (missRecord) {
-      try {
-        // Update the attendance record with the reflection note
-        await attendanceService.submitProof(room.id, user?.id, null, reflectionText)
-      } catch (err) {
-        console.log('Reflection saved locally (API may not support update yet)')
-      }
-      setReflectionDismissed(true)
-    }
-  }
-
-  // Phase 1: Dynamic message context for this room
-  const messageContext = useMemo(() => ({
-    isOpen,
-    hasSubmitted: !!todayProofStatus && todayProofStatus !== 'rejected',
-    streak: streakData.current,
-    lastStreak: streakData.lastStreak,
-    urgencyLevel: getRoomCountdown(room)?.urgencyLevel || 'low',
-    countdown: getRoomCountdown(room)?.timeRemaining || '',
-    allComplete: todayProofStatus === 'approved',
-    hasMissedRecently: unreflectedMisses.length > 0,
-    phase,
-  }), [isOpen, todayProofStatus, streakData, room, unreflectedMisses.length, phase])
-  
-  // Get today's proof status
-  const todayStr = today.toISOString().split('T')[0]
-  const todayRecord = (attendanceData || []).find(a => a.date === todayStr)
-  const todayProofStatus = todayRecord?.status || null
   const todayProofNote = todayRecord?.note || null
   const rejectionReason = todayRecord?.rejection_reason || null
   
