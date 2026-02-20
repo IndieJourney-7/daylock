@@ -325,9 +325,6 @@ function RoomDetail() {
             <div className="mt-1.5">
               <CountdownTimer room={room} size="sm" />
             </div>
-              {displayRoom.name}
-            </h1>
-            <p className="text-gray-400 text-sm">{timeWindow}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
