@@ -31,32 +31,8 @@ CREATE TABLE IF NOT EXISTS user_achievements (
   UNIQUE(user_id, achievement_id)
 );
 
--- Seed achievement definitions
-INSERT INTO achievements (id, name, description, icon, category, tier, threshold, xp_reward, sort_order) VALUES
-  -- Streak achievements
-  ('streak_3',     '3-Day Streak',     'Maintain a 3-day streak',        '🔥', 'streak', 'bronze',    3,   25,  10),
-  ('streak_7',     'Week Warrior',     'Maintain a 7-day streak',        '🔥', 'streak', 'silver',    7,   50,  20),
-  ('streak_14',    'Two Week Titan',   'Maintain a 14-day streak',       '💪', 'streak', 'silver',   14,  100,  30),
-  ('streak_30',    'Monthly Master',   'Maintain a 30-day streak',       '🎯', 'streak', 'gold',     30,  200,  40),
-  ('streak_60',    'Iron Will',        'Maintain a 60-day streak',       '⚔️', 'streak', 'platinum',  60,  400,  50),
-  ('streak_100',   'Century Legend',    'Maintain a 100-day streak',      '👑', 'streak', 'legendary',100,  750,  60),
-  -- Attendance achievements
-  ('first_room',   'First Room',       'Complete your first room',       '🎯', 'attendance', 'bronze',  1,   25,  70),
-  ('rooms_10',     'Regular',          'Attend 10 rooms',                '📊', 'attendance', 'bronze', 10,   50,  80),
-  ('rooms_50',     'Dedicated',        'Attend 50 rooms',                '📈', 'attendance', 'silver', 50,  150,  90),
-  ('rooms_100',    'Century Club',     'Attend 100 rooms',               '💯', 'attendance', 'gold',  100,  300, 100),
-  ('rooms_500',    'Hall of Fame',     'Attend 500 rooms',               '🏛️', 'attendance', 'legendary', 500, 750, 110),
-  ('perfect_day',  'Perfect Day',      'Complete all rooms in one day',  '⭐', 'attendance', 'bronze',  1,   50, 120),
-  ('perfect_week', 'Perfect Week',     'Complete all rooms every day for a week', '🌟', 'attendance', 'gold', 7, 300, 130),
-  -- Quality achievements
-  ('quality_5',    'Five Star',        'Receive a 5-star quality rating', '⭐', 'quality', 'silver',   1,  100, 140),
-  ('quality_avg_4','Quality Standard', 'Maintain 4+ quality average over 10+ reviews', '💎', 'quality', 'gold', 10, 200, 150),
-  -- Social achievements
-  ('first_challenge','Challenger',     'Join your first challenge',      '🤝', 'social', 'bronze',    1,   50, 160),
-  ('challenge_win', 'Champion',        'Win a challenge',                '🏆', 'social', 'gold',      1,  200, 170),
-  ('comeback',     'Comeback Kid',     'Recover from a missed day and get approved next day', '💪', 'special', 'silver', 1, 100, 180),
-  ('early_bird',   'Early Bird',       'Submit proof within 15 minutes of room opening', '🐦', 'special', 'bronze', 1, 50, 190)
-ON CONFLICT (id) DO NOTHING;
+-- Achievement definitions should be inserted manually via Supabase dashboard
+-- or through the admin interface using real data.
 
 -- ============================================================
 -- 2. LEADERBOARDS

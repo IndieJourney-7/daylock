@@ -44,7 +44,7 @@ function CreateChallengeModal({ onClose, onCreate }) {
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="e.g., 7-Day Streak Battle"
-              className="w-full bg-charcoal-500/50 border border-charcoal-400/20 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500/50"
+              className="w-full bg-charcoal-500/50 border border-charcoal-400/20 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-green-500/50"
               required
             />
           </div>
@@ -57,7 +57,7 @@ function CreateChallengeModal({ onClose, onCreate }) {
               onChange={e => setDescription(e.target.value)}
               placeholder="What's this challenge about?"
               rows={2}
-              className="w-full bg-charcoal-500/50 border border-charcoal-400/20 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500/50 resize-none"
+              className="w-full bg-charcoal-500/50 border border-charcoal-400/20 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-green-500/50 resize-none"
             />
           </div>
 
@@ -72,7 +72,7 @@ function CreateChallengeModal({ onClose, onCreate }) {
                   onClick={() => setType(ct.value)}
                   className={`text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
                     type === ct.value
-                      ? 'border-blue-500/50 bg-blue-500/10 text-white'
+                      ? 'border-green-500/50 bg-green-500/10 text-white'
                       : 'border-charcoal-400/20 bg-charcoal-500/20 text-gray-400 hover:border-charcoal-400/40'
                   }`}
                 >
@@ -85,22 +85,34 @@ function CreateChallengeModal({ onClose, onCreate }) {
 
           {/* Duration */}
           <div>
-            <label className="text-gray-400 text-xs font-medium mb-1 block">Duration (days)</label>
-            <div className="flex gap-2">
+            <label className="text-gray-400 text-xs font-medium mb-2 block">Duration (days)</label>
+            <div className="flex gap-2 mb-2">
               {[7, 14, 21, 30].map(d => (
                 <button
                   key={d}
                   type="button"
                   onClick={() => setTargetDays(d)}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    targetDays === d
-                      ? 'bg-blue-600 text-white'
+                    targetDays === d && ![7, 14, 21, 30].includes(targetDays) === false
+                      ? 'bg-green-600 text-white'
                       : 'bg-charcoal-500/30 text-gray-400 hover:text-white'
                   }`}
                 >
                   {d}d
                 </button>
               ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 text-xs">or custom:</span>
+              <input
+                type="number"
+                min={1}
+                max={365}
+                value={targetDays}
+                onChange={e => setTargetDays(Math.max(1, Math.min(365, parseInt(e.target.value) || 1)))}
+                className="w-20 bg-charcoal-500/50 border border-charcoal-400/20 rounded-lg px-3 py-1.5 text-white text-sm text-center focus:outline-none focus:border-green-500/50"
+              />
+              <span className="text-gray-500 text-xs">days</span>
             </div>
           </div>
 
@@ -116,7 +128,7 @@ function CreateChallengeModal({ onClose, onCreate }) {
             <button
               type="submit"
               disabled={loading || !title.trim()}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+              className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
             >
               {loading ? 'Creating...' : 'Create'}
             </button>
@@ -150,7 +162,7 @@ export default function Challenges() {
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           + New Challenge
         </button>
@@ -218,7 +230,7 @@ export default function Challenges() {
           <p className="text-gray-500 text-sm mb-4">Create your first challenge and invite friends to compete</p>
           <button
             onClick={() => setShowCreate(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors"
+            className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors"
           >
             Create a Challenge
           </button>

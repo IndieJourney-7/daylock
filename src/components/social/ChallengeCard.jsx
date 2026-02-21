@@ -12,13 +12,13 @@ function ChallengeCard({ challenge, currentUserId, onJoin, onLeave, onLogDay, co
   const myParticipation = participants.find(p => p.user_id === currentUserId)
   const isParticipant = !!myParticipation
   const statusBadge = challengesService.getStatusBadge(challenge.status)
-  const daysLeft = challengesService.getDaysRemaining(challenge.ends_at)
+  const daysLeft = challengesService.getDaysRemaining(challenge.end_date)
   const isActive = challenge.status === 'active'
 
   // Sort participants by completed days
   const sorted = [...participants]
-    .filter(p => p.status === 'active')
-    .sort((a, b) => b.completed_days - a.completed_days)
+    .filter(p => p.status === 'joined' || p.status === 'won' || p.status === 'completed')
+    .sort((a, b) => (b.progress || 0) - (a.progress || 0))
 
   if (compact) {
     return (
@@ -65,7 +65,7 @@ function ChallengeCard({ challenge, currentUserId, onJoin, onLeave, onLogDay, co
           <p className="text-gray-500 text-[10px]">Players</p>
         </div>
         <div className="bg-charcoal-500/30 rounded-lg p-2">
-          <p className="text-white font-bold text-sm">{challenge.target_days || '—'}</p>
+          <p className="text-white font-bold text-sm">{challenge.goal || '—'}</p>
           <p className="text-gray-500 text-[10px]">Target Days</p>
         </div>
         <div className="bg-charcoal-500/30 rounded-lg p-2">
@@ -83,26 +83,26 @@ function ChallengeCard({ challenge, currentUserId, onJoin, onLeave, onLogDay, co
           <div className="space-y-1.5">
             {sorted.slice(0, 5).map((p, i) => {
               const isMe = p.user_id === currentUserId
-              const progress = challengesService.getProgress(p.completed_days, challenge.target_days)
+                  const progressPct = challengesService.getProgress(p.progress, challenge.goal)
               return (
                 <div
                   key={p.user_id}
                   className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs ${
-                    isMe ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-charcoal-500/20'
+                    isMe ? 'bg-green-500/10 border border-green-500/20' : 'bg-charcoal-500/20'
                   }`}
                 >
                   <span className="text-gray-500 w-4 text-center font-medium">{i + 1}</span>
-                  <span className={`flex-1 truncate ${isMe ? 'text-blue-400 font-medium' : 'text-white'}`}>
+                  <span className={`flex-1 truncate ${isMe ? 'text-green-400 font-medium' : 'text-white'}`}>
                     {p.display_name || (isMe ? 'You' : `Player ${i + 1}`)}
                   </span>
                   <span className="text-orange-400">🔥{p.current_streak || 0}</span>
                   <div className="w-16 h-1.5 bg-charcoal-500/50 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-green-500 rounded-full transition-all"
-                      style={{ width: `${progress}%` }}
+                      style={{ width: `${progressPct}%` }}
                     />
                   </div>
-                  <span className="text-gray-400 w-10 text-right">{p.completed_days}d</span>
+                  <span className="text-gray-400 w-10 text-right">{p.progress || 0}d</span>
                 </div>
               )
             })}
@@ -131,7 +131,7 @@ function ChallengeCard({ challenge, currentUserId, onJoin, onLeave, onLogDay, co
           ) : (
             <button
               onClick={() => onJoin?.(challenge.id)}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 rounded-lg transition-colors"
             >
               Join Challenge
             </button>
@@ -140,14 +140,18 @@ function ChallengeCard({ challenge, currentUserId, onJoin, onLeave, onLogDay, co
       )}
 
       {/* Winner display */}
-      {challenge.status === 'completed' && challenge.winner_id && (
-        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-center">
-          <span className="text-lg">👑</span>
-          <p className="text-yellow-400 font-medium text-sm">
-            {challenge.winner_id === currentUserId ? 'You won!' : 'Challenge Complete'}
-          </p>
-        </div>
-      )}
+      {challenge.status === 'completed' && (() => {
+        const winner = participants.find(p => p.status === 'won')
+        if (!winner) return null
+        return (
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-center">
+            <span className="text-lg">👑</span>
+            <p className="text-yellow-400 font-medium text-sm">
+              {winner.user_id === currentUserId ? 'You won!' : 'Challenge Complete'}
+            </p>
+          </div>
+        )
+      })()}
     </div>
   )
 }

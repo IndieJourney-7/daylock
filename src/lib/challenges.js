@@ -50,7 +50,8 @@ export const challengesService = {
   CHALLENGE_TYPES: [
     { value: 'streak', label: 'Streak Challenge', description: 'Who can build the longest streak' },
     { value: 'attendance', label: 'Attendance Challenge', description: 'Most days attended wins' },
-    { value: 'punctuality', label: 'Punctuality Challenge', description: 'No late submissions allowed' }
+    { value: 'consistency', label: 'Consistency Challenge', description: 'Stay consistent over the period' },
+    { value: 'custom', label: 'Custom Challenge', description: 'Set your own rules' }
   ],
 
   /** Get status badge */
@@ -65,9 +66,9 @@ export const challengesService = {
   },
 
   /** Calculate days remaining */
-  getDaysRemaining(endsAt) {
+  getDaysRemaining(endDate) {
     const now = new Date()
-    const end = new Date(endsAt)
+    const end = new Date(endDate)
     const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24))
     return Math.max(0, diff)
   },
