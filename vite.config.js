@@ -3,6 +3,19 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split vendor libs into separate cached chunks
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-charts': ['recharts'],
+          'vendor-export': ['jspdf', 'html2canvas'],
+        }
+      }
+    }
+  },
   plugins: [
     react(),
     VitePWA({
@@ -53,7 +66,9 @@ export default defineConfig({
         ]
       },
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}']
+        globPatterns: ['**/*.{js,css,html,ico,svg,woff2}'],
+        // Increase limit so all JS chunks get precached (default 2MB too low)
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024
       }
     })
   ],

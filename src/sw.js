@@ -7,8 +7,8 @@
  * CUSTOM: Handles Web Push events so notifications arrive even when the PWA is closed.
  */
 
-import { precacheAndRoute } from 'workbox-precaching'
-import { registerRoute } from 'workbox-routing'
+import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching'
+import { registerRoute, NavigationRoute } from 'workbox-routing'
 import { NetworkFirst, CacheFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
@@ -149,15 +149,13 @@ self.addEventListener('notificationclick', (event) => {
 
 // ============================================================
 // NAVIGATION FALLBACK: SPA support
+// Serves the precached index.html for ALL navigation requests
+// so React Router handles /analytics, /rooms/123, etc. instantly
 // ============================================================
 
-// Handle navigation requests — serve index.html for SPA routing
-self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      caches.match('/index.html').then((cached) => {
-        return cached || fetch(event.request)
-      })
-    )
-  }
+const navigationHandler = createHandlerBoundToURL('/index.html')
+const navigationRoute = new NavigationRoute(navigationHandler, {
+  // Don't intercept API calls
+  denylist: [/^\/api/]
 })
+registerRoute(navigationRoute)
