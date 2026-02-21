@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Avatar, Icon, Badge } from '../components/ui'
 import { useAuth } from '../contexts'
-import { useRooms } from '../hooks'
+import { useRooms, usePushSubscription } from '../hooks'
 
 // Toggle Switch Component
 function Toggle({ enabled, onChange, disabled = false }) {
@@ -60,6 +60,7 @@ function SettingsSkeleton() {
 function Settings() {
   const { user, profile, signOut, updateProfile } = useAuth()
   const { data: rooms, loading: roomsLoading } = useRooms(user?.id)
+  const { isSupported: pushSupported, isSubscribed: pushSubscribed, permission: pushPermission, subscribe: subscribePush, unsubscribe: unsubscribePush, isLoading: pushLoading } = usePushSubscription()
   const navigate = useNavigate()
   
   // User settings state - initialized from profile
@@ -205,34 +206,47 @@ function Settings() {
           <h2 className="text-white font-semibold">Notifications</h2>
         </div>
         
-        {/* Browser notification status */}
+        {/* Push notification status */}
         <div className="mb-4 p-3 rounded-lg bg-charcoal-500/30 border border-charcoal-400/10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm">🔔</span>
               <div>
-                <p className="text-white text-sm">Browser Notifications</p>
+                <p className="text-white text-sm">Push Notifications</p>
                 <p className="text-gray-500 text-xs">
-                  {typeof Notification !== 'undefined'
-                    ? Notification.permission === 'granted'
-                      ? 'Enabled — you\'ll receive room reminders'
-                      : Notification.permission === 'denied'
+                  {!pushSupported
+                    ? 'Not supported in this browser'
+                    : pushSubscribed
+                      ? 'Active — works even when app is closed'
+                      : pushPermission === 'denied'
                         ? 'Blocked — enable in browser settings'
-                        : 'Not enabled yet'
-                    : 'Not supported in this browser'}
+                        : 'Enable to get alerts even when app is closed'}
                 </p>
               </div>
             </div>
-            {typeof Notification !== 'undefined' && Notification.permission === 'default' && (
+            {pushSupported && !pushSubscribed && pushPermission !== 'denied' && (
               <button
-                onClick={() => Notification.requestPermission()}
-                className="bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                onClick={subscribePush}
+                disabled={pushLoading}
+                className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
               >
-                Enable
+                {pushLoading ? '...' : 'Enable'}
               </button>
             )}
-            {typeof Notification !== 'undefined' && Notification.permission === 'granted' && (
-              <span className="text-green-400 text-xs font-medium px-2 py-1 rounded-full bg-green-500/10">Active</span>
+            {pushSubscribed && (
+              <div className="flex items-center gap-2">
+                <span className="text-green-400 text-xs font-medium px-2 py-1 rounded-full bg-green-500/10">Active</span>
+                <button
+                  onClick={unsubscribePush}
+                  disabled={pushLoading}
+                  className="text-gray-500 hover:text-red-400 text-xs transition-colors"
+                >
+                  Disable
+                </button>
+              </div>
+            )}
+            {pushPermission === 'denied' && (
+              <span className="text-red-400 text-xs font-medium px-2 py-1 rounded-full bg-red-500/10">Blocked</span>
             )}
           </div>
         </div>
@@ -280,7 +294,7 @@ function Settings() {
         </div>
         
         <p className="text-gray-600 text-xs mt-4">
-          Manage per-room alert timings on each room's detail page. Click "Save Changes" above for notification preferences.
+          Manage per-room alert timings on each room's detail page. Push notifications work even when the app is closed on your phone.
         </p>
       </Card>
       

@@ -331,6 +331,7 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data)
     }),
+    getVapidKey: () => request('/api/notifications/vapid-public-key'),
     subscribePush: (subscription) => request('/api/notifications/push/subscribe', {
       method: 'POST',
       body: JSON.stringify(subscription)

@@ -2,19 +2,22 @@
  * RoomReminderSettings Component
  * Per-room reminder configuration with preset + custom timing options.
  * Shows as an expandable card on the RoomDetail page.
+ * 
+ * Now with Web Push support — notifications work even when the app is closed!
  */
 
 import { useState, useEffect } from 'react'
-import { useRoomReminders } from '../../hooks'
+import { useRoomReminders, usePushSubscription } from '../../hooks'
 import { remindersService, REMINDER_PRESETS } from '../../lib/reminders'
 
 function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
   const { reminders, loading, setReminders } = useRoomReminders(roomId)
+  const { isSupported, isSubscribed, permission, subscribe } = usePushSubscription()
   const [expanded, setExpanded] = useState(false)
   const [selected, setSelected] = useState([])
   const [customMinutes, setCustomMinutes] = useState('')
   const [saving, setSaving] = useState(false)
-  const [permissionStatus, setPermissionStatus] = useState('default')
+  const [subscribing, setSubscribing] = useState(false)
 
   // Sync selected from DB data
   useEffect(() => {
@@ -23,18 +26,15 @@ function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
     }
   }, [reminders])
 
-  // Check notification permission
-  useEffect(() => {
-    if (remindersService.isSupported()) {
-      setPermissionStatus(Notification.permission)
-    } else {
-      setPermissionStatus('unsupported')
+  const handleEnablePush = async () => {
+    setSubscribing(true)
+    try {
+      await subscribe()
+    } catch (err) {
+      console.error('Failed to enable push:', err)
+    } finally {
+      setSubscribing(false)
     }
-  }, [])
-
-  const handleRequestPermission = async () => {
-    const result = await remindersService.requestPermission()
-    setPermissionStatus(result)
   }
 
   const togglePreset = (minutes) => {
@@ -104,16 +104,16 @@ function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
       {/* Expandable content */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-charcoal-400/10 pt-4 space-y-4">
-          {/* Permission check */}
-          {permissionStatus === 'unsupported' && (
+          {/* Push subscription status */}
+          {!isSupported && (
             <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-center">
               <p className="text-yellow-400 text-xs">
-                Your browser doesn't support notifications
+                Your browser doesn't support push notifications
               </p>
             </div>
           )}
 
-          {permissionStatus === 'denied' && (
+          {isSupported && permission === 'denied' && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
               <p className="text-red-400 text-xs">
                 Notifications are blocked. Please enable them in your browser settings.
@@ -121,29 +121,39 @@ function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
             </div>
           )}
 
-          {permissionStatus === 'default' && (
+          {isSupported && permission !== 'denied' && !isSubscribed && (
             <button
-              onClick={handleRequestPermission}
-              className="w-full bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-400 text-sm font-medium py-2.5 rounded-lg transition-colors"
+              onClick={handleEnablePush}
+              disabled={subscribing}
+              className="w-full bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-400 text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
             >
-              🔔 Enable Notifications
+              {subscribing ? 'Enabling...' : '🔔 Enable Push Notifications'}
             </button>
           )}
 
+          {isSubscribed && (
+            <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-lg p-2.5">
+              <span className="text-green-400 text-xs">✓</span>
+              <p className="text-green-400 text-xs font-medium">
+                Push enabled — you'll get alerts even when the app is closed
+              </p>
+            </div>
+          )}
+
           {/* Preset options */}
-          {permissionStatus !== 'unsupported' && permissionStatus !== 'denied' && (
+          {isSupported && permission !== 'denied' && (
             <>
               <div>
                 <p className="text-gray-400 text-xs font-medium mb-2">Alert me before room opens</p>
                 <div className="flex flex-wrap gap-2">
                   {REMINDER_PRESETS.map(preset => {
-                    const isSelected = selected.includes(preset.value)
+                    const isActive = selected.includes(preset.value)
                     return (
                       <button
                         key={preset.value}
                         onClick={() => togglePreset(preset.value)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                          isSelected
+                          isActive
                             ? 'bg-green-600 border-green-500 text-white'
                             : 'bg-charcoal-500/30 border-charcoal-400/20 text-gray-400 hover:border-charcoal-400/40 hover:text-white'
                         }`}
@@ -223,7 +233,9 @@ function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
 
               {/* Info note */}
               <p className="text-gray-600 text-[10px] text-center">
-                Alerts work while the app is open in your browser. Keep a tab open to receive reminders.
+                {isSubscribed
+                  ? 'Push notifications enabled — you\'ll get alerts even when the app is closed.'
+                  : 'Enable push notifications above to get alerts even when the app is closed.'}
               </p>
             </>
           )}
