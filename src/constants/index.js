@@ -23,6 +23,9 @@ export const ROOMS = {
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'home' },
   { id: 'rooms', label: 'Rooms', path: '/rooms', icon: 'rooms' },
+  { id: 'leaderboard', label: 'Leaderboard', path: '/leaderboard', icon: 'trophy' },
+  { id: 'challenges', label: 'Challenges', path: '/challenges', icon: 'sword' },
+  { id: 'feed', label: 'Feed', path: '/feed', icon: 'activity' },
   { id: 'analytics', label: 'Analytics', path: '/analytics', icon: 'chart' },
   { id: 'gallery', label: 'Gallery', path: '/gallery', icon: 'gallery' },
   { id: 'history', label: 'History', path: '/history', icon: 'history' },

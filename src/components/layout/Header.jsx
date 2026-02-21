@@ -5,10 +5,14 @@
 
 import { useLocation } from 'react-router-dom'
 import { Icon } from '../ui'
+import NotificationBell from '../social/NotificationBell'
 
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
   '/rooms': 'Rooms',
+  '/leaderboard': 'Leaderboard',
+  '/challenges': 'Challenges',
+  '/feed': 'Feed',
   '/history': 'History',
   '/profile': 'Profile',
   '/settings': 'Settings',
@@ -41,11 +45,10 @@ function Header({ title, showBack = false, onBack, rightAction }) {
         </div>
         
         {/* Right side */}
-        {rightAction && (
-          <div className="flex items-center">
-            {rightAction}
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          {rightAction && rightAction}
+        </div>
       </div>
     </header>
   )

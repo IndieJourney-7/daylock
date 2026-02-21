@@ -271,6 +271,99 @@ export const api = {
     resolveConsequence: (consequenceId) => request(`/api/warnings/consequences/${consequenceId}/resolve`, {
       method: 'POST'
     })
+  },
+
+  // Achievements
+  achievements: {
+    getAll: () => request('/api/achievements'),
+    getMine: () => request('/api/achievements/me'),
+    getUnnotified: () => request('/api/achievements/unnotified'),
+    markNotified: (achievementIds) => request('/api/achievements/mark-notified', {
+      method: 'POST',
+      body: JSON.stringify({ achievementIds })
+    }),
+    check: () => request('/api/achievements/check', { method: 'POST' })
+  },
+
+  // Leaderboard
+  leaderboard: {
+    getGlobal: (options = {}) => {
+      const params = new URLSearchParams()
+      if (options.sortBy) params.set('sortBy', options.sortBy)
+      if (options.period) params.set('period', options.period)
+      if (options.limit) params.set('limit', options.limit)
+      const query = params.toString()
+      return request(`/api/leaderboard${query ? `?${query}` : ''}`)
+    },
+    getForRoom: (roomId) => request(`/api/leaderboard/room/${roomId}`),
+    getMyRank: () => request('/api/leaderboard/me')
+  },
+
+  // Challenges
+  challenges: {
+    list: () => request('/api/challenges'),
+    get: (id) => request(`/api/challenges/${id}`),
+    getForRoom: (roomId) => request(`/api/challenges/room/${roomId}`),
+    create: (data) => request('/api/challenges', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+    join: (id) => request(`/api/challenges/${id}/join`, { method: 'POST' }),
+    leave: (id) => request(`/api/challenges/${id}/leave`, { method: 'POST' }),
+    logDay: (id) => request(`/api/challenges/${id}/log`, { method: 'POST' }),
+    getParticipants: (id) => request(`/api/challenges/${id}/participants`)
+  },
+
+  // Notifications
+  notifications: {
+    list: (options = {}) => {
+      const params = new URLSearchParams()
+      if (options.limit) params.set('limit', options.limit)
+      if (options.unreadOnly) params.set('unreadOnly', 'true')
+      const query = params.toString()
+      return request(`/api/notifications${query ? `?${query}` : ''}`)
+    },
+    getUnreadCount: () => request('/api/notifications/unread-count'),
+    markRead: (id) => request(`/api/notifications/${id}/read`, { method: 'POST' }),
+    markAllRead: () => request('/api/notifications/read-all', { method: 'POST' }),
+    getPreferences: () => request('/api/notifications/preferences'),
+    updatePreferences: (data) => request('/api/notifications/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }),
+    subscribePush: (subscription) => request('/api/notifications/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify(subscription)
+    }),
+    unsubscribePush: (endpoint) => request('/api/notifications/push/subscribe', {
+      method: 'DELETE',
+      body: JSON.stringify({ endpoint })
+    })
+  },
+
+  // Activity Feed
+  feed: {
+    get: (options = {}) => {
+      const params = new URLSearchParams()
+      if (options.limit) params.set('limit', options.limit)
+      if (options.before) params.set('before', options.before)
+      const query = params.toString()
+      return request(`/api/feed${query ? `?${query}` : ''}`)
+    },
+    getForRoom: (roomId, options = {}) => {
+      const params = new URLSearchParams()
+      if (options.limit) params.set('limit', options.limit)
+      if (options.before) params.set('before', options.before)
+      const query = params.toString()
+      return request(`/api/feed/room/${roomId}${query ? `?${query}` : ''}`)
+    },
+    getGlobal: (options = {}) => {
+      const params = new URLSearchParams()
+      if (options.limit) params.set('limit', options.limit)
+      if (options.before) params.set('before', options.before)
+      const query = params.toString()
+      return request(`/api/feed/global${query ? `?${query}` : ''}`)
+    }
   }
 }
 

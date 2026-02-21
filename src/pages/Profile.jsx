@@ -6,8 +6,9 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Avatar, Icon, Button } from '../components/ui'
+import { AchievementCard } from '../components/social'
 import { useAuth } from '../contexts'
-import { useRooms, useUserHistory } from '../hooks'
+import { useRooms, useUserHistory, useMyAchievements, useAchievementDefinitions } from '../hooks'
 
 // Rank colors and thresholds
 const getRankInfo = (score) => {
@@ -37,6 +38,10 @@ function Profile() {
   const navigate = useNavigate()
   const { data: rooms } = useRooms(user?.id)
   const { data: history, loading } = useUserHistory(user?.id)
+  
+  // Phase 3: Real achievements from database
+  const { achievements: earnedAchievements } = useMyAchievements()
+  const { data: allAchievements } = useAchievementDefinitions()
   
   // Calculate stats from real data
   const stats = useMemo(() => {
@@ -142,6 +147,14 @@ function Profile() {
   
   const earnedBadges = badges.filter(b => b.earned)
   const inProgressBadges = badges.filter(b => !b.earned)
+  
+  // Phase 3: Map earned DB achievements 
+  const earnedIds = new Set((earnedAchievements || []).map(a => a.achievement_id))
+  const dbAchievements = (allAchievements || []).map(a => ({
+    ...a,
+    earned: earnedIds.has(a.id),
+    earnedAt: (earnedAchievements || []).find(ea => ea.achievement_id === a.id)?.earned_at
+  }))
   
   return (
     <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
@@ -269,56 +282,73 @@ function Profile() {
             <span className="text-lg">🏆</span>
             <h2 className="text-white font-semibold">Achievements</h2>
           </div>
-          <span className="text-xs text-gray-500">{earnedBadges.length}/{badges.length} earned</span>
+          <span className="text-xs text-gray-500">
+            {dbAchievements.filter(a => a.earned).length}/{dbAchievements.length} earned
+          </span>
         </div>
         
-        {/* Earned Badges */}
-        {earnedBadges.length > 0 && (
-          <div className="mb-4">
-            <p className="text-gray-500 text-xs mb-3">Earned</p>
-            <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
-              {earnedBadges.map((badge) => (
-                <div 
-                  key={badge.id}
-                  className="flex flex-col items-center p-2 rounded-xl bg-accent/10 border border-accent/30"
-                  title={badge.description}
-                >
-                  <span className="text-2xl">{badge.icon}</span>
-                  <span className="text-xs text-gray-400 mt-1 text-center truncate w-full">{badge.name}</span>
-                </div>
-              ))}
-            </div>
+        {/* DB Achievements Grid */}
+        {dbAchievements.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+            {dbAchievements.filter(a => a.earned).map(a => (
+              <AchievementCard key={a.id} achievement={a} earned earnedAt={a.earnedAt} />
+            ))}
+            {dbAchievements.filter(a => !a.earned).map(a => (
+              <AchievementCard key={a.id} achievement={a} earned={false} />
+            ))}
           </div>
         )}
-        
-        {/* In Progress Badges */}
-        {inProgressBadges.length > 0 && (
-          <div>
-            <p className="text-gray-500 text-xs mb-3">In Progress</p>
-            <div className="space-y-3">
-              {inProgressBadges.map((badge) => (
-                <div 
-                  key={badge.id}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-charcoal-500/30"
-                >
-                  <span className="text-2xl opacity-50">{badge.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-white text-sm font-medium">{badge.name}</p>
-                      <span className="text-xs text-gray-500">{Math.round(badge.progress)}%</span>
+
+        {/* Fallback: Local badges when DB not loaded */}
+        {dbAchievements.length === 0 && (
+          <>
+            {earnedBadges.length > 0 && (
+              <div className="mb-4">
+                <p className="text-gray-500 text-xs mb-3">Earned</p>
+                <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
+                  {earnedBadges.map((badge) => (
+                    <div 
+                      key={badge.id}
+                      className="flex flex-col items-center p-2 rounded-xl bg-accent/10 border border-accent/30"
+                      title={badge.description}
+                    >
+                      <span className="text-2xl">{badge.icon}</span>
+                      <span className="text-xs text-gray-400 mt-1 text-center truncate w-full">{badge.name}</span>
                     </div>
-                    <div className="h-1.5 bg-charcoal-500 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-accent/50 rounded-full"
-                        style={{ width: `${badge.progress}%` }}
-                      />
-                    </div>
-                    <p className="text-gray-500 text-xs mt-1">{badge.description}</p>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+            )}
+            
+            {inProgressBadges.length > 0 && (
+              <div>
+                <p className="text-gray-500 text-xs mb-3">In Progress</p>
+                <div className="space-y-3">
+                  {inProgressBadges.map((badge) => (
+                    <div 
+                      key={badge.id}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-charcoal-500/30"
+                    >
+                      <span className="text-2xl opacity-50">{badge.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-white text-sm font-medium">{badge.name}</p>
+                          <span className="text-xs text-gray-500">{Math.round(badge.progress)}%</span>
+                        </div>
+                        <div className="h-1.5 bg-charcoal-500 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-accent/50 rounded-full"
+                            style={{ width: `${badge.progress}%` }}
+                          />
+                        </div>
+                        <p className="text-gray-500 text-xs mt-1">{badge.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </Card>
       

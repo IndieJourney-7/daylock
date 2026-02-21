@@ -38,6 +38,9 @@ import {
 } from './pages/admin'
 import Analytics from './pages/Analytics'
 import Gallery from './pages/Gallery'
+import Leaderboard from './pages/Leaderboard'
+import Challenges from './pages/Challenges'
+import Feed from './pages/Feed'
 
 // Landing Page Component
 function LandingPage() {
@@ -82,6 +85,9 @@ function App() {
           <Route path="/history" element={<History />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/challenges" element={<Challenges />} />
+          <Route path="/feed" element={<Feed />} />
         </Route>
         
         {/* Admin Routes - Join page is public */}

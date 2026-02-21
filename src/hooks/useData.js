@@ -12,6 +12,11 @@ import {
   galleryService,
   warningsService
 } from '../lib'
+import { achievementsService } from '../lib/achievements'
+import { leaderboardService } from '../lib/leaderboard'
+import { challengesService } from '../lib/challenges'
+import { notificationsService } from '../lib/notifications'
+import { feedService } from '../lib/feed'
 
 // Generic fetch hook
 function useFetch(fetchFn, deps = [], shouldFetch = true) {
@@ -408,6 +413,209 @@ export function useRoomConsequences(roomId) {
   }
 }
 
+// ============ PHASE 3: SOCIAL & GAMIFICATION HOOKS ============
+
+/**
+ * Fetch all achievement definitions
+ */
+export function useAchievementDefinitions() {
+  return useFetch(() => achievementsService.getAllDefinitions(), [])
+}
+
+/**
+ * Fetch current user's earned achievements
+ */
+export function useMyAchievements() {
+  const result = useFetch(() => achievementsService.getMyAchievements(), [])
+  return { achievements: result.data || [], ...result }
+}
+
+/**
+ * Fetch unnotified achievements (for toasts)
+ */
+export function useUnnotifiedAchievements() {
+  const { data, refetch, ...rest } = useFetch(
+    () => achievementsService.getUnnotified(),
+    []
+  )
+
+  const markSeen = async (ids) => {
+    await achievementsService.markNotified(ids)
+    refetch()
+  }
+
+  return { achievements: data || [], markSeen, refetch, ...rest }
+}
+
+/**
+ * Fetch global leaderboard
+ */
+export function useLeaderboard(options = {}) {
+  const { sortBy = 'discipline_score', period = 'all', limit = 50 } = options
+  return useFetch(
+    () => leaderboardService.getGlobal({ sortBy, period, limit }),
+    [sortBy, period, limit]
+  )
+}
+
+/**
+ * Fetch room leaderboard
+ */
+export function useRoomLeaderboard(roomId) {
+  return useFetch(
+    () => leaderboardService.getForRoom(roomId),
+    [roomId],
+    !!roomId
+  )
+}
+
+/**
+ * Fetch current user's rank
+ */
+export function useMyRank() {
+  return useFetch(() => leaderboardService.getMyRank(), [])
+}
+
+/**
+ * Fetch user's active challenges
+ */
+export function useChallenges() {
+  const { data, refetch, setData, ...rest } = useFetch(
+    () => challengesService.getActive(),
+    []
+  )
+
+  const joinChallenge = async (id) => {
+    await challengesService.join(id)
+    refetch()
+  }
+
+  const leaveChallenge = async (id) => {
+    await challengesService.leave(id)
+    refetch()
+  }
+
+  const logDay = async (id) => {
+    await challengesService.logDay(id)
+    refetch()
+  }
+
+  return { challenges: data || [], refetch, joinChallenge, leaveChallenge, logDay, ...rest }
+}
+
+/**
+ * Fetch room challenges
+ */
+export function useRoomChallenges(roomId) {
+  return useFetch(
+    () => challengesService.getForRoom(roomId),
+    [roomId],
+    !!roomId
+  )
+}
+
+/**
+ * Fetch notifications for current user
+ */
+export function useNotifications(options = {}) {
+  const { data, refetch, setData, ...rest } = useFetch(
+    () => notificationsService.getAll(options),
+    [options.unreadOnly]
+  )
+
+  const markRead = async (id) => {
+    await notificationsService.markRead(id)
+    setData(prev => (prev || []).map(n => n.id === id ? { ...n, read: true } : n))
+  }
+
+  const markAllRead = async () => {
+    await notificationsService.markAllRead()
+    setData(prev => (prev || []).map(n => ({ ...n, read: true })))
+  }
+
+  return { notifications: data || [], markRead, markAllRead, refetch, ...rest }
+}
+
+/**
+ * Fetch unread notification count
+ */
+export function useUnreadCount() {
+  const [count, setCount] = useState(0)
+  
+  const refetch = useCallback(async () => {
+    try {
+      const c = await notificationsService.getUnreadCount()
+      setCount(c)
+    } catch {
+      setCount(0)
+    }
+  }, [])
+
+  useEffect(() => {
+    refetch()
+    // Poll every 60s
+    const interval = setInterval(refetch, 60000)
+    return () => clearInterval(interval)
+  }, [refetch])
+
+  return { count, refetch }
+}
+
+/**
+ * Fetch activity feed for user's rooms
+ */
+export function useActivityFeed(options = {}) {
+  const [events, setEvents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [hasMore, setHasMore] = useState(true)
+
+  const fetchMore = useCallback(async () => {
+    setLoading(true)
+    try {
+      const before = events.length > 0 ? events[events.length - 1].created_at : undefined
+      const data = await feedService.getMyFeed({ limit: 30, before, ...options })
+      if (data.length < 30) setHasMore(false)
+      setEvents(prev => before ? [...prev, ...data] : data)
+    } catch (err) {
+      console.error('Feed fetch error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [events.length])
+
+  const refetch = useCallback(async () => {
+    setEvents([])
+    setHasMore(true)
+    setLoading(true)
+    try {
+      const data = await feedService.getMyFeed({ limit: 30, ...options })
+      if (data.length < 30) setHasMore(false)
+      setEvents(data)
+    } catch (err) {
+      console.error('Feed fetch error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    refetch()
+  }, [refetch])
+
+  return { events, loading, hasMore, fetchMore, refetch }
+}
+
+/**
+ * Fetch room-specific feed
+ */
+export function useRoomFeed(roomId) {
+  return useFetch(
+    () => feedService.getForRoom(roomId, { limit: 30 }),
+    [roomId],
+    !!roomId
+  )
+}
+
 export default {
   useRooms,
   useRoom,
@@ -422,5 +630,17 @@ export default {
   useGalleryRoomPhotos,
   useAdminWarnings,
   useRoomWarnings,
-  useRoomConsequences
+  useRoomConsequences,
+  useAchievementDefinitions,
+  useMyAchievements,
+  useUnnotifiedAchievements,
+  useLeaderboard,
+  useRoomLeaderboard,
+  useMyRank,
+  useChallenges,
+  useRoomChallenges,
+  useNotifications,
+  useUnreadCount,
+  useActivityFeed,
+  useRoomFeed
 }

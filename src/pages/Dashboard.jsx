@@ -21,8 +21,11 @@ import {
   DisciplineScoreBadge,
   MissConfrontation 
 } from '../components/pressure'
+import { AchievementToastManager } from '../components/social/AchievementToast'
+import { LeaderboardTable } from '../components/social'
+import { ActivityFeed } from '../components/social/ActivityFeedItem'
 import { useAuth } from '../contexts'
-import { useRooms, useUserHistory } from '../hooks'
+import { useRooms, useUserHistory, useUnnotifiedAchievements, useLeaderboard, useActivityFeed } from '../hooks'
 import { roomsService } from '../lib'
 import { 
   getRoomCountdown, getStreakPhase, calculateStreak, 
@@ -86,6 +89,13 @@ function Dashboard() {
   const { data: rooms, loading: roomsLoading, error } = useRooms(user?.id)
   const { data: history, loading: historyLoading } = useUserHistory(user?.id)
   const [showConfrontation, setShowConfrontation] = useState(true)
+
+  // Phase 3: Achievement toasts
+  const { achievements: newAchievements, markSeen } = useUnnotifiedAchievements()
+  // Phase 3: Mini leaderboard
+  const { data: leaderboardData } = useLeaderboard({ limit: 5 })
+  // Phase 3: Mini feed
+  const { events: feedEvents } = useActivityFeed()
   
   const today = new Date()
   const dayName = today.toLocaleDateString('en-US', { weekday: 'long' })
@@ -343,6 +353,41 @@ function Dashboard() {
           </Link>
         </div>
       </div>
+
+      {/* Phase 3: Social Widgets */}
+      <div className="grid gap-5 md:grid-cols-2 pt-4 border-t border-charcoal-400/10">
+        {/* Mini Leaderboard */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-white font-semibold text-sm">🏆 Top 5</h3>
+            <Link to="/leaderboard" className="text-gray-400 hover:text-accent text-xs transition-colors">
+              View all →
+            </Link>
+          </div>
+          <LeaderboardTable entries={leaderboardData || []} currentUserId={user?.id} compact />
+        </div>
+
+        {/* Mini Activity Feed */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-white font-semibold text-sm">📡 Recent Activity</h3>
+            <Link to="/feed" className="text-gray-400 hover:text-accent text-xs transition-colors">
+              View all →
+            </Link>
+          </div>
+          <Card className="bg-charcoal-500/20 border-charcoal-400/20 p-3">
+            <ActivityFeed events={feedEvents.slice(0, 5)} emptyMessage="No recent activity" />
+          </Card>
+        </div>
+      </div>
+
+      {/* Phase 3: Achievement Toast Manager */}
+      {newAchievements.length > 0 && (
+        <AchievementToastManager
+          achievements={newAchievements}
+          onAllDismissed={() => markSeen(newAchievements.map(a => a.id))}
+        />
+      )}
     </div>
   )
 }
