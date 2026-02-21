@@ -21,6 +21,7 @@ import {
   ReflectionLock 
 } from '../components/pressure'
 import { EditRoomModal, DeleteRoomModal } from '../components/modals'
+import { RoomReminderSettings } from '../components/social'
 import { DAYS, MONTHS } from '../constants'
 import { useRoom, useAttendance } from '../hooks'
 import { useAuth } from '../contexts'
@@ -387,6 +388,13 @@ function RoomDetail() {
           <div className="text-xs text-gray-500 mt-1">{disciplineData.title}</div>
         </Card>
       </div>
+      
+      {/* Room Reminders */}
+      <RoomReminderSettings
+        roomId={roomId}
+        roomName={room?.name}
+        roomEmoji={room?.emoji}
+      />
       
       {/* Room Rules */}
       <Card>

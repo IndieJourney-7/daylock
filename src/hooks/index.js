@@ -25,5 +25,8 @@ export {
   useNotifications,
   useUnreadCount,
   useActivityFeed,
-  useRoomFeed
+  useRoomFeed,
+  useAllReminders,
+  useRoomReminders
 } from './useData'
+export { useReminderScheduler } from './useReminderScheduler'

@@ -266,3 +266,25 @@ CREATE POLICY "Users can view activity in their rooms" ON activity_feed FOR SELE
   ))
 );
 CREATE POLICY "System can insert feed events" ON activity_feed FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- ============================================================
+-- 8. ROOM REMINDERS
+-- Per-user, per-room custom alert timings
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS room_reminders (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  minutes_before INTEGER NOT NULL DEFAULT 5,  -- minutes before room opens
+  enabled BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, room_id, minutes_before)
+);
+
+CREATE INDEX IF NOT EXISTS idx_room_reminders_user ON room_reminders(user_id);
+CREATE INDEX IF NOT EXISTS idx_room_reminders_room ON room_reminders(room_id);
+CREATE INDEX IF NOT EXISTS idx_room_reminders_enabled ON room_reminders(user_id) WHERE enabled = true;
+
+ALTER TABLE room_reminders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own reminders" ON room_reminders FOR ALL USING (auth.uid() = user_id);

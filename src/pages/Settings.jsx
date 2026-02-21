@@ -205,24 +205,46 @@ function Settings() {
           <h2 className="text-white font-semibold">Notifications</h2>
         </div>
         
+        {/* Browser notification status */}
+        <div className="mb-4 p-3 rounded-lg bg-charcoal-500/30 border border-charcoal-400/10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">🔔</span>
+              <div>
+                <p className="text-white text-sm">Browser Notifications</p>
+                <p className="text-gray-500 text-xs">
+                  {typeof Notification !== 'undefined'
+                    ? Notification.permission === 'granted'
+                      ? 'Enabled — you\'ll receive room reminders'
+                      : Notification.permission === 'denied'
+                        ? 'Blocked — enable in browser settings'
+                        : 'Not enabled yet'
+                    : 'Not supported in this browser'}
+                </p>
+              </div>
+            </div>
+            {typeof Notification !== 'undefined' && Notification.permission === 'default' && (
+              <button
+                onClick={() => Notification.requestPermission()}
+                className="bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Enable
+              </button>
+            )}
+            {typeof Notification !== 'undefined' && Notification.permission === 'granted' && (
+              <span className="text-green-400 text-xs font-medium px-2 py-1 rounded-full bg-green-500/10">Active</span>
+            )}
+          </div>
+        </div>
+        
         <div className="space-y-1">
           <SettingRow 
             title="Room Reminders"
-            description="Get notified 15 min before room opens"
+            description="Get alerts before your rooms open"
           >
             <Toggle 
               enabled={notifications.roomReminders}
               onChange={(val) => handleNotificationChange('roomReminders', val)}
-            />
-          </SettingRow>
-          
-          <SettingRow 
-            title="Daily Summary"
-            description="End of day attendance report"
-          >
-            <Toggle 
-              enabled={notifications.dailySummary}
-              onChange={(val) => handleNotificationChange('dailySummary', val)}
             />
           </SettingRow>
           
@@ -233,6 +255,16 @@ function Settings() {
             <Toggle 
               enabled={notifications.streakAlerts}
               onChange={(val) => handleNotificationChange('streakAlerts', val)}
+            />
+          </SettingRow>
+          
+          <SettingRow 
+            title="Daily Summary"
+            description="End of day attendance report"
+          >
+            <Toggle 
+              enabled={notifications.dailySummary}
+              onChange={(val) => handleNotificationChange('dailySummary', val)}
             />
           </SettingRow>
           
@@ -248,7 +280,7 @@ function Settings() {
         </div>
         
         <p className="text-gray-600 text-xs mt-4">
-          Click "Save Changes" above to persist notification preferences
+          Manage per-room alert timings on each room's detail page. Click "Save Changes" above for notification preferences.
         </p>
       </Card>
       

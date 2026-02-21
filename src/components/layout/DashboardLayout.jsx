@@ -9,8 +9,12 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import BottomNav from './BottomNav'
+import { useReminderScheduler } from '../../hooks'
 
 function DashboardLayout() {
+  // Start background reminder scheduler
+  useReminderScheduler()
+
   return (
     <div className="min-h-screen bg-charcoal-900">
       <div className="flex">

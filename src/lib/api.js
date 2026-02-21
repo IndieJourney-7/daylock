@@ -341,6 +341,25 @@ export const api = {
     })
   },
 
+  // Room Reminders
+  reminders: {
+    getAll: () => request('/api/reminders'),
+    getForRoom: (roomId) => request(`/api/reminders/room/${roomId}`),
+    setForRoom: (roomId, minutesBefore) => request(`/api/reminders/room/${roomId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ minutesBefore })
+    }),
+    add: (roomId, minutesBefore) => request('/api/reminders', {
+      method: 'POST',
+      body: JSON.stringify({ roomId, minutesBefore })
+    }),
+    remove: (id) => request(`/api/reminders/${id}`, { method: 'DELETE' }),
+    toggle: (id, enabled) => request(`/api/reminders/${id}/toggle`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled })
+    })
+  },
+
   // Activity Feed
   feed: {
     get: (options = {}) => {

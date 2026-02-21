@@ -17,6 +17,7 @@ import { leaderboardService } from '../lib/leaderboard'
 import { challengesService } from '../lib/challenges'
 import { notificationsService } from '../lib/notifications'
 import { feedService } from '../lib/feed'
+import { remindersService } from '../lib/reminders'
 
 // Generic fetch hook
 function useFetch(fetchFn, deps = [], shouldFetch = true) {
@@ -616,6 +617,45 @@ export function useRoomFeed(roomId) {
   )
 }
 
+// ============ ROOM REMINDERS ============
+
+/**
+ * Get all reminders for current user (with room info)
+ */
+export function useAllReminders() {
+  return useFetch(() => remindersService.getAll(), [])
+}
+
+/**
+ * Get reminders for a specific room + actions
+ */
+export function useRoomReminders(roomId) {
+  const { data, loading, error, refetch } = useFetch(
+    () => remindersService.getForRoom(roomId),
+    [roomId],
+    !!roomId
+  )
+
+  const setReminders = useCallback(async (minutesBefore) => {
+    await remindersService.setForRoom(roomId, minutesBefore)
+    refetch()
+  }, [roomId, refetch])
+
+  const removeReminder = useCallback(async (reminderId) => {
+    await remindersService.remove(reminderId)
+    refetch()
+  }, [refetch])
+
+  return {
+    reminders: data || [],
+    loading,
+    error,
+    refetch,
+    setReminders,
+    removeReminder
+  }
+}
+
 export default {
   useRooms,
   useRoom,
@@ -642,5 +682,7 @@ export default {
   useNotifications,
   useUnreadCount,
   useActivityFeed,
-  useRoomFeed
+  useRoomFeed,
+  useAllReminders,
+  useRoomReminders
 }
