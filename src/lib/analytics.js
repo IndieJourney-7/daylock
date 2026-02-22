@@ -194,14 +194,7 @@ export async function getAdminAnalytics() {
 
   if (error) throw new Error(error.message)
 
-  // Enrich records with room & user info for exports
-  const all = (records || []).map(r => ({
-    ...r,
-    room: roomMap[r.room_id] || null,
-    user: profileMap[r.user_id] || null
-  }))
-
-  // 3. Get profiles for users in these rooms
+  // 3. Get profiles for users in these rooms (MUST come before enrichment)
   const allUserIds = [...new Set((records || []).map(r => r.user_id))]
   const profileMap = {}
   if (allUserIds.length > 0) {
@@ -211,6 +204,13 @@ export async function getAdminAnalytics() {
       .in('id', allUserIds)
     for (const p of (profiles || [])) profileMap[p.id] = p
   }
+
+  // Enrich records with room & user info for exports
+  const all = (records || []).map(r => ({
+    ...r,
+    room: roomMap[r.room_id] || null,
+    user: profileMap[r.user_id] || null
+  }))
 
   // ── Overview ──
   const totalRecords = all.length

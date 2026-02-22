@@ -90,6 +90,32 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  // PWA fix: re-check session when app regains focus
+  // OAuth redirects may complete in the browser (not the PWA),
+  // so when the user switches back, we need to pick up the new session.
+  useEffect(() => {
+    const handleVisibility = async () => {
+      if (document.visibilityState !== 'visible') return
+      if (user) return // already logged in, skip
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          console.log('AuthContext: Session found on visibility change (PWA OAuth fix)')
+          setUser(session.user)
+          setLoading(false)
+          // Load profile in background
+          authService.ensureProfile(session.user)
+            .then(p => setProfile(p))
+            .catch(() => {})
+        }
+      } catch {
+        // ignore
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [user])
+
   // Sign up
   const signUp = async (email, password, name) => {
     setLoading(true)
