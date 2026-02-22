@@ -1,9 +1,10 @@
 /**
  * Room Reminders Service (Frontend)
- * Client-side helpers for room reminder management + browser notification scheduling
+ * Uses Supabase directly (RLS secures per-user access).
+ * The backend cron reads the same table for server-side push notifications.
  */
 
-import { api } from './api'
+import { supabase } from './supabase'
 
 /** Preset reminder options in minutes */
 export const REMINDER_PRESETS = [
@@ -15,32 +16,123 @@ export const REMINDER_PRESETS = [
   { value: 60, label: '1 hour' },
 ]
 
-export const remindersService = {
-  // ============ API CALLS ============
+/** Get user's IANA timezone */
+function getUserTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    return 'UTC'
+  }
+}
 
-  /** Get all reminders with room info */
+export const remindersService = {
+  // ============ SUPABASE DIRECT CALLS ============
+
+  /** Get all reminders for current user (with room info) */
   async getAll() {
-    return api.reminders.getAll()
+    const { data, error } = await supabase
+      .from('room_reminders')
+      .select('*, rooms(id, name, emoji, time_start, time_end)')
+      .eq('enabled', true)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('getAll reminders error:', error)
+      throw new Error(error.message)
+    }
+    return data || []
   },
 
   /** Get reminders for a specific room */
   async getForRoom(roomId) {
-    return api.reminders.getForRoom(roomId)
+    const { data, error } = await supabase
+      .from('room_reminders')
+      .select('*')
+      .eq('room_id', roomId)
+      .order('minutes_before', { ascending: true })
+
+    if (error) {
+      console.error('getForRoom reminders error:', error)
+      throw new Error(error.message)
+    }
+    return data || []
   },
 
   /** Set all reminders for a room (replaces existing) */
   async setForRoom(roomId, minutesBefore = []) {
-    return api.reminders.setForRoom(roomId, minutesBefore)
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    // Delete existing reminders for this room
+    const { error: delError } = await supabase
+      .from('room_reminders')
+      .delete()
+      .eq('room_id', roomId)
+
+    if (delError) {
+      console.error('Delete reminders error:', delError)
+      throw new Error(delError.message)
+    }
+
+    // If no reminders requested, done
+    if (!minutesBefore || minutesBefore.length === 0) {
+      return []
+    }
+
+    // Insert new reminders
+    const timezone = getUserTimezone()
+    const rows = minutesBefore.map(min => ({
+      user_id: user.id,
+      room_id: roomId,
+      minutes_before: min,
+      enabled: true,
+      timezone
+    }))
+
+    const { data, error } = await supabase
+      .from('room_reminders')
+      .insert(rows)
+      .select()
+
+    if (error) {
+      // If timezone column doesn't exist yet, retry without it
+      if (error.message?.includes('timezone') || error.code === '42703') {
+        console.warn('timezone column not found, retrying without it')
+        const rowsNoTz = minutesBefore.map(min => ({
+          user_id: user.id,
+          room_id: roomId,
+          minutes_before: min,
+          enabled: true
+        }))
+        const { data: data2, error: error2 } = await supabase
+          .from('room_reminders')
+          .insert(rowsNoTz)
+          .select()
+        if (error2) {
+          console.error('Insert reminders error (no tz):', error2)
+          throw new Error(error2.message)
+        }
+        return data2 || []
+      }
+
+      console.error('Insert reminders error:', error)
+      throw new Error(error.message)
+    }
+    return data || []
   },
 
-  /** Add a single reminder */
-  async add(roomId, minutesBefore) {
-    return api.reminders.add(roomId, minutesBefore)
-  },
-
-  /** Remove a reminder */
+  /** Remove a reminder by id */
   async remove(reminderId) {
-    return api.reminders.remove(reminderId)
+    const { error } = await supabase
+      .from('room_reminders')
+      .delete()
+      .eq('id', reminderId)
+
+    if (error) {
+      console.error('Remove reminder error:', error)
+      throw new Error(error.message)
+    }
   },
 
   // ============ BROWSER NOTIFICATIONS ============

@@ -12,7 +12,7 @@ import {
 } from 'recharts'
 import { Card, Button, Icon } from '../../components/ui'
 import { useAuth } from '../../contexts'
-import { api } from '../../lib'
+import { getAdminUserAnalytics } from '../../lib/analytics'
 import { exportToPDF, exportToExcel } from '../../lib/exportUtils'
 
 // ── Circular Progress Ring ──
@@ -126,7 +126,7 @@ export default function AdminUserAnalytics() {
   useEffect(() => {
     if (!user?.id || !userId) return
     setLoading(true)
-    api.analytics.adminUser(userId)
+    getAdminUserAnalytics(userId)
       .then(d => { setData(d); setError(null) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -145,7 +145,14 @@ export default function AdminUserAnalytics() {
     if (!data) return
     setExporting('excel')
     try {
-      exportToExcel(data.records || [], `daylock-${(data.user?.name || 'user').toLowerCase().replace(/\s+/g, '-')}-report`)
+      const extraData = {
+        overview: data.overview,
+        streaks: data.streaks,
+        roomBreakdown: data.roomBreakdown,
+        weeklyTrend: data.weeklyTrend,
+        monthlyTrend: data.monthlyTrend
+      }
+      exportToExcel(data.records || [], `daylock-${(data.user?.name || 'user').toLowerCase().replace(/\s+/g, '-')}-report`, extraData)
     } catch (e) { console.error('Excel export failed:', e) }
     finally { setTimeout(() => setExporting(null), 1000) }
   }

@@ -1,6 +1,6 @@
 /**
  * Export Utilities
- * PDF and Excel export for analytics data
+ * Comprehensive PDF and Excel export for analytics data
  */
 
 import jsPDF from 'jspdf'
@@ -8,172 +8,364 @@ import 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
 
+// ── Helper: add new page if needed ──
+function checkPageBreak(doc, neededSpace = 40) {
+  const pageHeight = doc.internal.pageSize.height
+  const currentY = doc.lastAutoTable?.finalY || 40
+  if (currentY + neededSpace > pageHeight - 20) {
+    doc.addPage()
+    return 20
+  }
+  return currentY
+}
+
+// ── Helper: consistency grade ──
+function getGrade(rate) {
+  if (rate >= 95) return 'A+'
+  if (rate >= 90) return 'A'
+  if (rate >= 80) return 'B'
+  if (rate >= 70) return 'C'
+  if (rate >= 60) return 'D'
+  return 'F'
+}
+
 /**
- * Export attendance records to Excel
+ * Export attendance records to Excel (comprehensive multi-sheet workbook)
  */
-export function exportToExcel(records, fileName = 'daylock-report') {
-  const rows = records.map(r => ({
+export function exportToExcel(records, fileName = 'daylock-report', extraData = {}) {
+  const wb = XLSX.utils.book_new()
+
+  // ── Sheet 1: Attendance Log (all records) ──
+  const logRows = (records || []).map(r => ({
     Date: r.date,
     Room: r.room?.name || r.roomName || '-',
-    Status: r.status,
+    Status: r.status?.replace('_', ' ') || '-',
     'Submitted At': r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '-',
     'Reviewed At': r.reviewed_at ? new Date(r.reviewed_at).toLocaleString() : '-',
     Note: r.note || '-'
   }))
 
-  const ws = XLSX.utils.json_to_sheet(rows)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'Attendance')
+  if (logRows.length > 0) {
+    const ws1 = XLSX.utils.json_to_sheet(logRows)
+    ws1['!cols'] = Object.keys(logRows[0]).map(key => ({
+      wch: Math.max(key.length + 2, ...logRows.map(r => String(r[key] || '').length).slice(0, 100))
+    }))
+    XLSX.utils.book_append_sheet(wb, ws1, 'Attendance Log')
+  }
 
-  // Auto-width columns
-  const colWidths = Object.keys(rows[0] || {}).map(key => ({
-    wch: Math.max(key.length, ...rows.map(r => String(r[key] || '').length))
-  }))
-  ws['!cols'] = colWidths
+  // ── Sheet 2: Summary (if overview provided) ──
+  if (extraData.overview) {
+    const o = extraData.overview
+    const s = extraData.streaks || {}
+    const summaryRows = [
+      { Metric: 'Total Days Tracked', Value: o.totalDays ?? o.totalRecords ?? 0 },
+      { Metric: 'Approved', Value: o.approved ?? 0 },
+      { Metric: 'Rejected', Value: o.rejected ?? 0 },
+      { Metric: 'Missed', Value: o.missed ?? 0 },
+      { Metric: 'Pending Review', Value: o.pending ?? o.pendingReview ?? 0 },
+      { Metric: 'Attendance Rate', Value: `${o.overallRate ?? o.rate ?? 0}%` },
+      { Metric: 'Consistency Grade', Value: getGrade(o.overallRate ?? o.rate ?? 0) },
+      { Metric: 'Current Streak', Value: `${s.currentStreak ?? 0} days` },
+      { Metric: 'Best Streak', Value: `${s.bestStreak ?? 0} days` },
+      { Metric: 'Report Generated', Value: new Date().toLocaleString() },
+    ]
+    const ws2 = XLSX.utils.json_to_sheet(summaryRows)
+    ws2['!cols'] = [{ wch: 22 }, { wch: 20 }]
+    XLSX.utils.book_append_sheet(wb, ws2, 'Summary')
+  }
+
+  // ── Sheet 3: Room Breakdown (if available) ──
+  if (extraData.roomBreakdown?.length > 0) {
+    const roomRows = extraData.roomBreakdown.map(r => ({
+      Room: `${r.emoji || ''} ${r.name}`.trim(),
+      'Total Days': r.total,
+      Approved: r.approved,
+      Rejected: r.rejected ?? 0,
+      Missed: r.missed ?? 0,
+      'Rate (%)': r.rate,
+      Grade: getGrade(r.rate)
+    }))
+    const ws3 = XLSX.utils.json_to_sheet(roomRows)
+    ws3['!cols'] = roomRows.length > 0
+      ? Object.keys(roomRows[0]).map(key => ({ wch: Math.max(key.length + 2, 12) }))
+      : []
+    XLSX.utils.book_append_sheet(wb, ws3, 'Room Breakdown')
+  }
+
+  // ── Sheet 4: Weekly Trend (if available) ──
+  if (extraData.weeklyTrend?.length > 0) {
+    const weekRows = extraData.weeklyTrend.map(w => ({
+      Week: w.week || w.month,
+      Approved: w.approved,
+      Total: w.total,
+      'Rate (%)': w.rate
+    }))
+    const ws4 = XLSX.utils.json_to_sheet(weekRows)
+    ws4['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 }]
+    XLSX.utils.book_append_sheet(wb, ws4, 'Weekly Trend')
+  }
+
+  // ── Sheet 5: Monthly Trend (if available) ──
+  if (extraData.monthlyTrend?.length > 0) {
+    const monthRows = extraData.monthlyTrend.map(m => ({
+      Month: m.month,
+      Approved: m.approved,
+      Rejected: m.rejected,
+      Missed: m.missed,
+      Total: m.total,
+      'Rate (%)': m.rate
+    }))
+    const ws5 = XLSX.utils.json_to_sheet(monthRows)
+    ws5['!cols'] = [{ wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }]
+    XLSX.utils.book_append_sheet(wb, ws5, 'Monthly Trend')
+  }
 
   const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
   saveAs(new Blob([buf], { type: 'application/octet-stream' }), `${fileName}.xlsx`)
 }
 
 /**
- * Export analytics summary to PDF
+ * Export user analytics to PDF — comprehensive progress report
  */
 export function exportToPDF(analytics, userName = 'User', fileName = 'daylock-report') {
   const doc = new jsPDF()
-  const { overview, streaks, roomBreakdown } = analytics
+  const { overview, streaks, roomBreakdown, weeklyTrend, monthlyTrend } = analytics
+  const rate = overview.overallRate ?? overview.rate ?? 0
 
-  // Title
-  doc.setFontSize(20)
+  // ── Title ──
+  doc.setFontSize(22)
   doc.setTextColor(40, 40, 40)
   doc.text('DayLock Progress Report', 14, 22)
 
   doc.setFontSize(10)
   doc.setTextColor(120, 120, 120)
-  doc.text(`Generated for ${userName} on ${new Date().toLocaleDateString()}`, 14, 30)
+  doc.text(`Generated for ${userName} on ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 30)
 
-  // Overview stats
+  // ── Consistency Grade Banner ──
+  doc.setFontSize(12)
+  doc.setTextColor(80, 80, 80)
+  doc.text(`Consistency Grade: ${getGrade(rate)}  |  Attendance Rate: ${rate}%  |  Current Streak: ${streaks?.currentStreak || 0} days  |  Best Streak: ${streaks?.bestStreak || 0} days`, 14, 38)
+
+  // ── Overview Stats ──
   doc.setFontSize(14)
   doc.setTextColor(40, 40, 40)
-  doc.text('Overview', 14, 44)
+  doc.text('Performance Overview', 14, 50)
 
   doc.autoTable({
-    startY: 48,
+    startY: 54,
     head: [['Metric', 'Value']],
     body: [
-      ['Total Days Tracked', overview.totalDays],
-      ['Approved', overview.approved],
-      ['Rejected', overview.rejected],
-      ['Missed', overview.missed],
-      ['Attendance Rate', `${overview.overallRate}%`],
+      ['Total Days Tracked', overview.totalDays ?? overview.totalRecords ?? 0],
+      ['Days Approved', overview.approved ?? 0],
+      ['Days Rejected', overview.rejected ?? 0],
+      ['Days Missed', overview.missed ?? 0],
+      ['Pending Review', overview.pending ?? overview.pendingReview ?? 0],
+      ['Attendance Rate', `${rate}%`],
+      ['Consistency Grade', getGrade(rate)],
       ['Current Streak', `${streaks?.currentStreak || 0} days`],
       ['Best Streak', `${streaks?.bestStreak || 0} days`],
     ],
     theme: 'striped',
     headStyles: { fillColor: [59, 130, 246] },
-    styles: { fontSize: 10 }
+    styles: { fontSize: 10 },
+    columnStyles: { 0: { fontStyle: 'bold' } }
   })
 
-  // Room breakdown
-  if (roomBreakdown && roomBreakdown.length > 0) {
-    const y = doc.lastAutoTable.finalY + 12
+  // ── Room Breakdown ──
+  if (roomBreakdown?.length > 0) {
+    let y = checkPageBreak(doc, 50) + 12
     doc.setFontSize(14)
-    doc.text('Room Breakdown', 14, y)
+    doc.setTextColor(40, 40, 40)
+    doc.text('Room-by-Room Breakdown', 14, y)
 
     doc.autoTable({
       startY: y + 4,
-      head: [['Room', 'Total', 'Approved', 'Rate']],
+      head: [['Room', 'Total Days', 'Approved', 'Rejected', 'Missed', 'Rate', 'Grade']],
       body: roomBreakdown.map(r => [
-        `${r.emoji} ${r.name}`,
+        `${r.emoji || ''} ${r.name}`.trim(),
         r.total,
         r.approved,
-        `${r.rate}%`
+        r.rejected ?? 0,
+        r.missed ?? 0,
+        `${r.rate}%`,
+        getGrade(r.rate)
       ]),
       theme: 'striped',
       headStyles: { fillColor: [59, 130, 246] },
-      styles: { fontSize: 10 }
+      styles: { fontSize: 9 }
     })
   }
 
-  // Attendance log
-  if (analytics.records && analytics.records.length > 0) {
-    const y2 = doc.lastAutoTable.finalY + 12
+  // ── Weekly Trend ──
+  if (weeklyTrend?.length > 0) {
+    let y = checkPageBreak(doc, 50) + 12
     doc.setFontSize(14)
-    doc.text('Attendance Log', 14, y2)
+    doc.setTextColor(40, 40, 40)
+    doc.text('Weekly Trend (Last 12 Weeks)', 14, y)
 
-    const logRows = analytics.records.slice(-50).reverse().map(r => [
+    doc.autoTable({
+      startY: y + 4,
+      head: [['Week', 'Approved', 'Total', 'Rate']],
+      body: weeklyTrend.map(w => [
+        w.week, w.approved, w.total, `${w.rate}%`
+      ]),
+      theme: 'striped',
+      headStyles: { fillColor: [99, 102, 241] },
+      styles: { fontSize: 9 }
+    })
+  }
+
+  // ── Monthly Trend ──
+  if (monthlyTrend?.length > 0) {
+    let y = checkPageBreak(doc, 50) + 12
+    doc.setFontSize(14)
+    doc.setTextColor(40, 40, 40)
+    doc.text('Monthly Breakdown', 14, y)
+
+    doc.autoTable({
+      startY: y + 4,
+      head: [['Month', 'Approved', 'Rejected', 'Missed', 'Total', 'Rate']],
+      body: monthlyTrend.map(m => [
+        m.month, m.approved, m.rejected, m.missed, m.total, `${m.rate}%`
+      ]),
+      theme: 'striped',
+      headStyles: { fillColor: [99, 102, 241] },
+      styles: { fontSize: 9 }
+    })
+  }
+
+  // ── Full Attendance Log ──
+  if (analytics.records?.length > 0) {
+    let y = checkPageBreak(doc, 50) + 12
+    doc.setFontSize(14)
+    doc.setTextColor(40, 40, 40)
+    doc.text(`Attendance Log (${analytics.records.length} records)`, 14, y)
+
+    const logRows = [...analytics.records].reverse().map(r => [
       r.date,
-      r.room?.name || '-',
-      r.status,
-      r.submitted_at ? new Date(r.submitted_at).toLocaleTimeString() : '-'
+      r.room?.name || r.roomName || '-',
+      r.status?.replace('_', ' ') || '-',
+      r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '-',
+      r.note || '-'
     ])
 
     doc.autoTable({
-      startY: y2 + 4,
-      head: [['Date', 'Room', 'Status', 'Submitted']],
+      startY: y + 4,
+      head: [['Date', 'Room', 'Status', 'Submitted', 'Note']],
       body: logRows,
       theme: 'striped',
       headStyles: { fillColor: [59, 130, 246] },
-      styles: { fontSize: 8 }
+      styles: { fontSize: 7 },
+      columnStyles: { 4: { cellWidth: 40 } }
     })
+  }
+
+  // ── Footer ──
+  const pageCount = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i)
+    doc.setFontSize(8)
+    doc.setTextColor(150, 150, 150)
+    doc.text(
+      `DayLock Report — ${userName} — Page ${i} of ${pageCount}`,
+      doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10,
+      { align: 'center' }
+    )
   }
 
   doc.save(`${fileName}.pdf`)
 }
 
 /**
- * Export admin analytics to PDF
+ * Export admin analytics to PDF — comprehensive multi-user report
  */
 export function exportAdminPDF(analytics, adminName = 'Admin', fileName = 'daylock-admin-report') {
   const doc = new jsPDF()
-  const { overview, userPerformance, roomStats } = analytics
+  const { overview, userPerformance, roomStats, weeklyTrend } = analytics
 
-  doc.setFontSize(20)
+  // ── Title ──
+  doc.setFontSize(22)
   doc.setTextColor(40, 40, 40)
   doc.text('DayLock Admin Report', 14, 22)
 
   doc.setFontSize(10)
   doc.setTextColor(120, 120, 120)
-  doc.text(`Generated for ${adminName} on ${new Date().toLocaleDateString()}`, 14, 30)
+  doc.text(`Generated for ${adminName} on ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 30)
 
-  // Overview
+  doc.setFontSize(11)
+  doc.setTextColor(80, 80, 80)
+  doc.text(`${analytics.totalUsers || 0} users  |  ${analytics.totalRooms || 0} rooms  |  Overall Rate: ${overview.overallRate || 0}%`, 14, 38)
+
+  // ── Overview ──
   doc.setFontSize(14)
   doc.setTextColor(40, 40, 40)
-  doc.text('Overview', 14, 44)
+  doc.text('Overview', 14, 50)
 
   doc.autoTable({
-    startY: 48,
+    startY: 54,
     head: [['Metric', 'Value']],
     body: [
-      ['Total Records', overview.totalRecords],
-      ['Approved', overview.approved],
-      ['Rejected', overview.rejected],
-      ['Missed', overview.missed],
-      ['Pending Review', overview.pendingReview],
-      ['Overall Rate', `${overview.overallRate}%`],
-      ['Total Rooms', analytics.totalRooms],
-      ['Total Users', analytics.totalUsers],
+      ['Total Records', overview.totalRecords ?? 0],
+      ['Approved', overview.approved ?? 0],
+      ['Rejected', overview.rejected ?? 0],
+      ['Missed', overview.missed ?? 0],
+      ['Pending Review', overview.pendingReview ?? 0],
+      ['Overall Rate', `${overview.overallRate ?? 0}%`],
+      ['Consistency Grade', getGrade(overview.overallRate ?? 0)],
+      ['Total Rooms', analytics.totalRooms ?? 0],
+      ['Total Users', analytics.totalUsers ?? 0],
     ],
     theme: 'striped',
     headStyles: { fillColor: [139, 92, 246] },
-    styles: { fontSize: 10 }
+    styles: { fontSize: 10 },
+    columnStyles: { 0: { fontStyle: 'bold' } }
   })
 
-  // User Performance
+  // ── User Performance Rankings ──
   if (userPerformance?.length) {
-    const y = doc.lastAutoTable.finalY + 12
+    let y = checkPageBreak(doc, 50) + 12
     doc.setFontSize(14)
-    doc.text('User Performance', 14, y)
+    doc.setTextColor(40, 40, 40)
+    doc.text('User Performance Rankings', 14, y)
 
     doc.autoTable({
       startY: y + 4,
-      head: [['User', 'Approved', 'Rejected', 'Missed', 'Rate', 'Streak']],
-      body: userPerformance.map(u => [
+      head: [['Rank', 'User', 'Total', 'Approved', 'Rejected', 'Missed', 'Rate', 'Grade', 'Current Streak', 'Best Streak']],
+      body: userPerformance.map((u, i) => [
+        i + 1,
         u.name,
+        u.total,
         u.approved,
         u.rejected,
         u.missed,
         `${u.rate}%`,
-        `${u.currentStreak}d`
+        getGrade(u.rate),
+        `${u.currentStreak}d`,
+        `${u.bestStreak}d`
+      ]),
+      theme: 'striped',
+      headStyles: { fillColor: [139, 92, 246] },
+      styles: { fontSize: 8 }
+    })
+  }
+
+  // ── Room Stats ──
+  if (roomStats?.length) {
+    let y = checkPageBreak(doc, 50) + 12
+    doc.setFontSize(14)
+    doc.setTextColor(40, 40, 40)
+    doc.text('Room Performance', 14, y)
+
+    doc.autoTable({
+      startY: y + 4,
+      head: [['Room', 'Owner', 'Total', 'Approved', 'Rate', 'Grade']],
+      body: roomStats.map(r => [
+        `${r.emoji || ''} ${r.name}`.trim(),
+        r.userName || '-',
+        r.total,
+        r.approved,
+        `${r.rate}%`,
+        getGrade(r.rate)
       ]),
       theme: 'striped',
       headStyles: { fillColor: [139, 92, 246] },
@@ -181,26 +373,58 @@ export function exportAdminPDF(analytics, adminName = 'Admin', fileName = 'daylo
     })
   }
 
-  // Room Stats
-  if (roomStats?.length) {
-    const y = doc.lastAutoTable.finalY + 12
+  // ── Weekly Trend ──
+  if (weeklyTrend?.length > 0) {
+    let y = checkPageBreak(doc, 50) + 12
     doc.setFontSize(14)
-    doc.text('Room Stats', 14, y)
+    doc.setTextColor(40, 40, 40)
+    doc.text('Weekly Trend', 14, y)
 
     doc.autoTable({
       startY: y + 4,
-      head: [['Room', 'User', 'Total', 'Approved', 'Rate']],
-      body: roomStats.map(r => [
-        `${r.emoji} ${r.name}`,
-        r.userName,
-        r.total,
-        r.approved,
-        `${r.rate}%`
-      ]),
+      head: [['Week', 'Approved', 'Total', 'Rate']],
+      body: weeklyTrend.map(w => [w.week, w.approved, w.total, `${w.rate}%`]),
       theme: 'striped',
-      headStyles: { fillColor: [139, 92, 246] },
+      headStyles: { fillColor: [99, 102, 241] },
       styles: { fontSize: 9 }
     })
+  }
+
+  // ── Full Attendance Log ──
+  if (analytics.records?.length > 0) {
+    let y = checkPageBreak(doc, 50) + 12
+    doc.setFontSize(14)
+    doc.setTextColor(40, 40, 40)
+    doc.text(`All Attendance Records (${analytics.records.length})`, 14, y)
+
+    const logRows = [...analytics.records].reverse().map(r => [
+      r.date,
+      r.user?.name || r.user?.email || '-',
+      r.status?.replace('_', ' ') || '-',
+      r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '-'
+    ])
+
+    doc.autoTable({
+      startY: y + 4,
+      head: [['Date', 'User', 'Status', 'Submitted']],
+      body: logRows,
+      theme: 'striped',
+      headStyles: { fillColor: [139, 92, 246] },
+      styles: { fontSize: 7 }
+    })
+  }
+
+  // ── Footer ──
+  const pageCount = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i)
+    doc.setFontSize(8)
+    doc.setTextColor(150, 150, 150)
+    doc.text(
+      `DayLock Admin Report — ${adminName} — Page ${i} of ${pageCount}`,
+      doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10,
+      { align: 'center' }
+    )
   }
 
   doc.save(`${fileName}.pdf`)

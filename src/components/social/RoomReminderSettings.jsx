@@ -12,7 +12,7 @@ import { remindersService, REMINDER_PRESETS } from '../../lib/reminders'
 import { api } from '../../lib/api'
 
 function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
-  const { reminders, loading, setReminders } = useRoomReminders(roomId)
+  const { reminders, loading, error: loadError, setReminders } = useRoomReminders(roomId)
   const { isSupported, isSubscribed, permission, subscribe } = usePushSubscription()
   const [expanded, setExpanded] = useState(false)
   const [selected, setSelected] = useState([])
@@ -138,8 +138,8 @@ function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
       }
     } catch (err) {
       console.error('Failed to save reminders:', err)
-      setSaveError('Failed to save reminders. Please try again.')
-      setTimeout(() => setSaveError(null), 5000)
+      setSaveError(err.message || 'Failed to save reminders. Please try again.')
+      setTimeout(() => setSaveError(null), 8000)
     } finally {
       setSaving(false)
     }
@@ -184,6 +184,17 @@ function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
       {/* Expandable content */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-charcoal-400/10 pt-4 space-y-4">
+          {/* DB/load error */}
+          {loadError && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
+              <p className="text-red-400 text-xs font-medium">Failed to load reminders</p>
+              <p className="text-red-400/70 text-[10px] mt-1">{loadError}</p>
+              <p className="text-gray-500 text-[10px] mt-1">
+                Make sure you've run the SQL schema in Supabase SQL Editor.
+              </p>
+            </div>
+          )}
+
           {/* Push subscription status */}
           {!isSupported && (
             <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-center">

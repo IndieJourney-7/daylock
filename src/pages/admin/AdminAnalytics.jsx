@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 import { Card, Button, Icon, Badge } from '../../components/ui'
 import { useAuth } from '../../contexts'
-import { api } from '../../lib'
+import { getAdminAnalytics } from '../../lib/analytics'
 import { exportAdminPDF, exportToExcel } from '../../lib/exportUtils'
 
 // ── Circular Progress ──
@@ -138,7 +138,7 @@ export default function AdminAnalytics() {
   useEffect(() => {
     if (!user?.id) return
     setLoading(true)
-    api.analytics.admin()
+    getAdminAnalytics()
       .then(d => { setData(d); setError(null) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -161,7 +161,11 @@ export default function AdminAnalytics() {
         roomName: r.room?.name || '-',
         userName: r.user?.name || r.user?.email || '-'
       }))
-      exportToExcel(rows, 'daylock-admin-report')
+      const extraData = {
+        overview: data.overview,
+        weeklyTrend: data.weeklyTrend
+      }
+      exportToExcel(rows, 'daylock-admin-report', extraData)
     } catch (e) { console.error(e) }
     finally { setTimeout(() => setExporting(null), 1000) }
   }

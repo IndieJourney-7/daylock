@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 import { Card, Button, Icon } from '../components/ui'
 import { useAuth } from '../contexts'
-import { api } from '../lib'
+import { getUserAnalytics, getUserRoomAnalytics } from '../lib/analytics'
 import { exportToPDF, exportToExcel } from '../lib/exportUtils'
 
 
@@ -123,7 +123,7 @@ function RoomDetail({ roomId, onBack }) {
   useEffect(() => {
     if (!user?.id || !roomId) return
     setLoading(true)
-    api.analytics.userRoom(roomId)
+    getUserRoomAnalytics(roomId)
       .then(d => { setData(d); setError(null) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -136,7 +136,9 @@ function RoomDetail({ roomId, onBack }) {
       const exportData = {
         overview: { ...data.overview, overallRate: data.overview.rate, totalDays: data.overview.totalDays },
         streaks: data.streaks,
-        roomBreakdown: [{ ...data.room, total: data.overview.totalDays, approved: data.overview.approved, rate: data.overview.rate }],
+        roomBreakdown: [{ ...data.room, total: data.overview.totalDays, approved: data.overview.approved, rejected: data.overview.rejected, missed: data.overview.missed, rate: data.overview.rate }],
+        weeklyTrend: data.weeklyTrend,
+        monthlyTrend: data.monthlyTrend,
         records: data.records?.map(r => ({ ...r, room: data.room }))
       }
       exportToPDF(exportData, `${data.room.emoji} ${data.room.name}`, `daylock-${data.room.name.toLowerCase().replace(/\s+/g, '-')}-report`)
@@ -149,7 +151,13 @@ function RoomDetail({ roomId, onBack }) {
     setExporting('excel')
     try {
       const rows = (data.records || []).map(r => ({ ...r, roomName: data.room.name }))
-      exportToExcel(rows, `daylock-${data.room.name.toLowerCase().replace(/\s+/g, '-')}-report`)
+      const extraData = {
+        overview: { ...data.overview, overallRate: data.overview.rate },
+        streaks: data.streaks,
+        weeklyTrend: data.weeklyTrend,
+        monthlyTrend: data.monthlyTrend
+      }
+      exportToExcel(rows, `daylock-${data.room.name.toLowerCase().replace(/\s+/g, '-')}-report`, extraData)
     } catch (e) { console.error('Excel export failed:', e) }
     finally { setTimeout(() => setExporting(null), 1000) }
   }
@@ -446,11 +454,11 @@ export default function UserAnalytics() {
   const [error, setError] = useState(null)
   const [selectedRoom, setSelectedRoom] = useState(null)
 
-  // Fetch room list with quick stats from the combined endpoint
+  // Fetch room list with quick stats via direct Supabase
   useEffect(() => {
     if (!user?.id) return
     setLoading(true)
-    api.analytics.user()
+    getUserAnalytics()
       .then(d => {
         setRooms(d.roomBreakdown || [])
         setError(null)
