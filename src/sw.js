@@ -7,15 +7,24 @@
  * CUSTOM: Handles Web Push events so notifications arrive even when the PWA is closed.
  */
 
-import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching'
+import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching'
 import { registerRoute, NavigationRoute } from 'workbox-routing'
 import { NetworkFirst, CacheFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 
 // ============================================================
+// LIFECYCLE: Activate new SW immediately on deploy
+// ============================================================
+self.skipWaiting()
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
+
+// ============================================================
 // WORKBOX: Precaching (injected by vite-plugin-pwa)
 // ============================================================
+cleanupOutdatedCaches()
 precacheAndRoute(self.__WB_MANIFEST)
 
 // ============================================================
