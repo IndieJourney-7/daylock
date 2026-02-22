@@ -10,6 +10,8 @@ import Differentiation from './components/Differentiation'
 import EmotionalStatement from './components/EmotionalStatement'
 import Waitlist from './components/Waitlist'
 import Footer from './components/Footer'
+import VideoDemo from './components/VideoDemo'
+import FeaturesShowcase from './components/FeaturesShowcase'
 
 // Auth components
 import { ProtectedRoute } from './components/auth'
@@ -59,6 +61,8 @@ function LandingPage() {
     <div className="min-h-screen bg-charcoal-900">
       <Navbar />
       <Hero />
+      <VideoDemo />
+      <FeaturesShowcase />
       <HowItWorks />
       <AccountabilityPartner />
       <Differentiation />
