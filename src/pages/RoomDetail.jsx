@@ -135,6 +135,26 @@ function RoomDetail() {
     phase,
   }), [isOpen, todayProofStatus, streakData, room, unreflectedMisses.length, phase])
 
+  // Derive rules from room (safe even when room is null)
+  const rules = room?.room_rules || []
+  const admin = room?.admin || null
+
+  // Group rules by group_title for structured display
+  // MUST be before early returns (React rules of hooks)
+  const groupedRules = useMemo(() => {
+    const enabledRules = rules.filter(r => r.enabled && r.text !== '(group placeholder)')
+    const ungrouped = enabledRules.filter(r => !r.group_title)
+    const groupMap = {}
+    enabledRules.filter(r => r.group_title).forEach(r => {
+      if (!groupMap[r.group_title]) {
+        groupMap[r.group_title] = { title: r.group_title, groupSort: r.group_sort || 0, items: [] }
+      }
+      groupMap[r.group_title].items.push(r)
+    })
+    const groups = Object.values(groupMap).sort((a, b) => a.groupSort - b.groupSort)
+    return { ungrouped, groups, hasGroups: groups.length > 0 }
+  }, [rules])
+
   // ============================================================
   // Early returns (after all hooks)
   // ============================================================
@@ -177,25 +197,8 @@ function RoomDetail() {
     }
   }
 
-  // Derive data from room
+  // Derive remaining room data
   const timeWindow = roomsService.getTimeWindow(room)
-  const rules = room.room_rules || []
-  const admin = room.admin || null
-
-  // Group rules by group_title for structured display
-  const groupedRules = useMemo(() => {
-    const enabledRules = rules.filter(r => r.enabled && r.text !== '(group placeholder)')
-    const ungrouped = enabledRules.filter(r => !r.group_title)
-    const groupMap = {}
-    enabledRules.filter(r => r.group_title).forEach(r => {
-      if (!groupMap[r.group_title]) {
-        groupMap[r.group_title] = { title: r.group_title, groupSort: r.group_sort || 0, items: [] }
-      }
-      groupMap[r.group_title].items.push(r)
-    })
-    const groups = Object.values(groupMap).sort((a, b) => a.groupSort - b.groupSort)
-    return { ungrouped, groups, hasGroups: groups.length > 0 }
-  }, [rules])
   const inviteCode = room.pending_invite?.invite_code || room.room_invites?.find(i => i.status === 'accepted')?.invite_code || null
   
   // Build attendance map from attendanceData
