@@ -24,6 +24,17 @@ function runAutoTable(doc, opts) {
   _lastTableY = doc.lastAutoTable?.finalY || _lastTableY
 }
 
+// ── Helper: strip emoji for PDF (default fonts don't support them) ──
+function stripEmoji(str) {
+  return (str || '').replace(/[\u{1F300}-\u{1FAD6}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '').trim()
+}
+
+// ── Helper: format room name for PDF ──
+function pdfRoomName(emoji, name) {
+  const cleaned = stripEmoji(emoji || '')
+  return cleaned ? `[${cleaned}] ${name}` : name
+}
+
 // ── Helper: consistency grade ──
 function getGrade(rate) {
   if (rate >= 95) return 'A+'
@@ -225,7 +236,7 @@ export function exportToPDF(analytics, userName = 'User', fileName = 'daylock-re
       startY: y + 4,
       head: [['Room', 'Total Days', 'Approved', 'Rejected', 'Missed', 'Rate', 'Grade']],
       body: roomBreakdown.map(r => [
-        `${r.emoji || ''} ${r.name}`.trim(),
+        r.name,
         r.total,
         r.approved,
         r.rejected ?? 0,
@@ -404,7 +415,7 @@ export function exportAdminPDF(analytics, adminName = 'Admin', fileName = 'daylo
       startY: y + 4,
       head: [['Room', 'Owner', 'Total', 'Approved', 'Rate', 'Grade']],
       body: roomStats.map(r => [
-        `${r.emoji || ''} ${r.name}`.trim(),
+        r.name,
         r.userName || '-',
         r.total,
         r.approved,
