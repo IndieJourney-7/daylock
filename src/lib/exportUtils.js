@@ -4,19 +4,24 @@
  */
 
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
+import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
 
 // ── Helper: add new page if needed ──
+let _lastTableY = 40
 function checkPageBreak(doc, neededSpace = 40) {
   const pageHeight = doc.internal.pageSize.height
-  const currentY = doc.lastAutoTable?.finalY || 40
+  const currentY = _lastTableY
   if (currentY + neededSpace > pageHeight - 20) {
     doc.addPage()
     return 20
   }
   return currentY
+}
+function runAutoTable(doc, opts) {
+  autoTable(doc, opts)
+  _lastTableY = doc.lastAutoTable?.finalY || _lastTableY
 }
 
 // ── Helper: consistency grade ──
@@ -166,6 +171,7 @@ export function exportToExcel(records, fileName = 'daylock-report', extraData = 
  */
 export function exportToPDF(analytics, userName = 'User', fileName = 'daylock-report') {
   const doc = new jsPDF()
+  _lastTableY = 40
   const { overview, streaks, roomBreakdown, weeklyTrend, monthlyTrend } = analytics
   const rate = overview.overallRate ?? overview.rate ?? 0
 
@@ -188,7 +194,7 @@ export function exportToPDF(analytics, userName = 'User', fileName = 'daylock-re
   doc.setTextColor(40, 40, 40)
   doc.text('Performance Overview', 14, 50)
 
-  doc.autoTable({
+  runAutoTable(doc, {
     startY: 54,
     head: [['Metric', 'Value']],
     body: [
@@ -215,7 +221,7 @@ export function exportToPDF(analytics, userName = 'User', fileName = 'daylock-re
     doc.setTextColor(40, 40, 40)
     doc.text('Room-by-Room Breakdown', 14, y)
 
-    doc.autoTable({
+    runAutoTable(doc, {
       startY: y + 4,
       head: [['Room', 'Total Days', 'Approved', 'Rejected', 'Missed', 'Rate', 'Grade']],
       body: roomBreakdown.map(r => [
@@ -240,7 +246,7 @@ export function exportToPDF(analytics, userName = 'User', fileName = 'daylock-re
     doc.setTextColor(40, 40, 40)
     doc.text('Weekly Trend (Last 12 Weeks)', 14, y)
 
-    doc.autoTable({
+    runAutoTable(doc, {
       startY: y + 4,
       head: [['Week', 'Approved', 'Total', 'Rate']],
       body: weeklyTrend.map(w => [
@@ -259,7 +265,7 @@ export function exportToPDF(analytics, userName = 'User', fileName = 'daylock-re
     doc.setTextColor(40, 40, 40)
     doc.text('Monthly Breakdown', 14, y)
 
-    doc.autoTable({
+    runAutoTable(doc, {
       startY: y + 4,
       head: [['Month', 'Approved', 'Rejected', 'Missed', 'Total', 'Rate']],
       body: monthlyTrend.map(m => [
@@ -286,7 +292,7 @@ export function exportToPDF(analytics, userName = 'User', fileName = 'daylock-re
       r.note || '-'
     ])
 
-    doc.autoTable({
+    runAutoTable(doc, {
       startY: y + 4,
       head: [['Date', 'Room', 'Status', 'Submitted', 'Note']],
       body: logRows,
@@ -318,6 +324,7 @@ export function exportToPDF(analytics, userName = 'User', fileName = 'daylock-re
  */
 export function exportAdminPDF(analytics, adminName = 'Admin', fileName = 'daylock-admin-report') {
   const doc = new jsPDF()
+  _lastTableY = 40
   const { overview, userPerformance, roomStats, weeklyTrend } = analytics
 
   // ── Title ──
@@ -338,7 +345,7 @@ export function exportAdminPDF(analytics, adminName = 'Admin', fileName = 'daylo
   doc.setTextColor(40, 40, 40)
   doc.text('Overview', 14, 50)
 
-  doc.autoTable({
+  runAutoTable(doc, {
     startY: 54,
     head: [['Metric', 'Value']],
     body: [
@@ -365,7 +372,7 @@ export function exportAdminPDF(analytics, adminName = 'Admin', fileName = 'daylo
     doc.setTextColor(40, 40, 40)
     doc.text('User Performance Rankings', 14, y)
 
-    doc.autoTable({
+    runAutoTable(doc, {
       startY: y + 4,
       head: [['Rank', 'User', 'Total', 'Approved', 'Rejected', 'Missed', 'Rate', 'Grade', 'Current Streak', 'Best Streak']],
       body: userPerformance.map((u, i) => [
@@ -393,7 +400,7 @@ export function exportAdminPDF(analytics, adminName = 'Admin', fileName = 'daylo
     doc.setTextColor(40, 40, 40)
     doc.text('Room Performance', 14, y)
 
-    doc.autoTable({
+    runAutoTable(doc, {
       startY: y + 4,
       head: [['Room', 'Owner', 'Total', 'Approved', 'Rate', 'Grade']],
       body: roomStats.map(r => [
@@ -417,7 +424,7 @@ export function exportAdminPDF(analytics, adminName = 'Admin', fileName = 'daylo
     doc.setTextColor(40, 40, 40)
     doc.text('Weekly Trend', 14, y)
 
-    doc.autoTable({
+    runAutoTable(doc, {
       startY: y + 4,
       head: [['Week', 'Approved', 'Total', 'Rate']],
       body: weeklyTrend.map(w => [w.week, w.approved, w.total, `${w.rate}%`]),
@@ -442,7 +449,7 @@ export function exportAdminPDF(analytics, adminName = 'Admin', fileName = 'daylo
       r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '-'
     ])
 
-    doc.autoTable({
+    runAutoTable(doc, {
       startY: y + 4,
       head: [['Date', 'User', 'Room', 'Status', 'Submitted']],
       body: logRows,
