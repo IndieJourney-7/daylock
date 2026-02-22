@@ -3,11 +3,14 @@ function AccountabilityPartner() {
     <section id="accountability" className="py-20 px-4">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-12">
+          <p className="text-accent text-sm font-semibold mb-2 tracking-wide uppercase">
+            Real accountability
+          </p>
           <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
-            Your Partner Holds the Keys
+            Someone Else Holds the Keys
           </h2>
           <p className="text-gray-500 max-w-2xl mx-auto">
-            Each room has an accountability partner — someone you trust to keep you honest.
+            Each room has a partner — the one person you can't lie to. They control your schedule, verify your proof, and see every miss.
           </p>
         </div>
         

@@ -15,8 +15,8 @@ function Footer() {
               />
             </div>
             <p className="text-gray-500 text-sm leading-relaxed">
-              Your Day. Locked.<br />
-              One Room at a Time.
+              Stop planning. Start proving.<br />
+              Accountability that actually works.
             </p>
           </div>
           

@@ -19,11 +19,11 @@ function Waitlist() {
           {!submitted ? (
             <>
               <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
-                Ready to Lock Your Day?
+                Ready to Stop Making Excuses?
               </h2>
               <p className="text-gray-500 mb-8 max-w-md mx-auto">
-                Join the waitlist. No spam, no hype.<br />
-                Just an invite when we're ready.
+                Join the waitlist and be first to lock your day.<br />
+                No spam. Just an invite when your slot opens.
               </p>
               
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -38,9 +38,9 @@ function Waitlist() {
                 
                 <button
                   type="submit"
-                  className="w-full py-4 bg-accent hover:bg-accent-dark text-charcoal-900 font-semibold rounded-lg transition-all duration-300 hover:shadow-glow"
+                  className="w-full py-4 bg-accent hover:bg-accent-dark text-charcoal-900 font-semibold rounded-lg transition-all duration-300 hover:shadow-glow text-lg"
                 >
-                  Join the Waitlist
+                  Get Early Access →
                 </button>
               </form>
               

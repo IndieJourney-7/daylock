@@ -6,8 +6,6 @@ import Navbar from './components/Navbar'
 import Hero from './components/Hero'
 import HowItWorks from './components/HowItWorks'
 import AccountabilityPartner from './components/AccountabilityPartner'
-import TodayView from './components/TodayView'
-import MarkAttendance from './components/MarkAttendance'
 import Differentiation from './components/Differentiation'
 import EmotionalStatement from './components/EmotionalStatement'
 import Waitlist from './components/Waitlist'
@@ -63,8 +61,6 @@ function LandingPage() {
       <Hero />
       <HowItWorks />
       <AccountabilityPartner />
-      <TodayView />
-      <MarkAttendance />
       <Differentiation />
       <EmotionalStatement />
       <Waitlist />

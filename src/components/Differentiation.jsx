@@ -1,19 +1,19 @@
 const comparisons = [
   {
-    others: 'Self-tracking with no consequences',
-    daylock: 'Accountability partners who enforce your commitments',
+    others: 'Track it yourself (and lie to yourself)',
+    daylock: 'Someone else verifies your proof',
   },
   {
-    others: 'Flexible schedules you keep breaking',
-    daylock: 'Time-locked rooms that close if you miss them',
+    others: '"Flexible" schedules you keep pushing',
+    daylock: 'Time-locked windows that close permanently',
   },
   {
-    others: 'Promises you make to yourself',
-    daylock: 'Proof verified by someone who cares',
+    others: 'Motivation that fades by Tuesday',
+    daylock: 'External pressure that doesn\'t care about your mood',
   },
   {
-    others: 'Apps that remind and nag',
-    daylock: 'Real people watching you show up',
+    others: 'Apps that send reminders you swipe away',
+    daylock: 'A real person watching if you showed up',
   },
 ]
 
@@ -21,13 +21,13 @@ function Differentiation() {
   return (
     <section className="py-20 px-4">
       <div className="max-w-4xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl font-bold text-white text-center mb-4">
-          This Is Different
-        </h2>
-        <p className="text-gray-500 text-center mb-12 max-w-lg mx-auto">
-          Daylock isn't self-help. It's external accountability.<br />
-          Someone else holds the keys to your day.
+        <p className="text-accent text-sm font-semibold text-center mb-2 tracking-wide uppercase">
+          Why this works
         </p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-white text-center mb-4">
+          You've Tried Discipline Apps Before.
+          <span className="block text-gray-400 font-normal text-lg mt-1">They didn't work because you were accountable to yourself.</span>
+        </h2>
         
         <div className="space-y-4">
           {comparisons.map((item, index) => (
