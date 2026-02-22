@@ -44,45 +44,16 @@ function computeStreaks(sortedDates) {
 
 export const leaderboardService = {
   /**
-   * Get global leaderboard — real stats from attendance + profiles
+   * Get global leaderboard — real stats computed from attendance + profiles.
+   * 
+   * Discipline Score formula:
+   *   approved_days × 10   (volume — rewards showing up)
+   * + attendance_rate × 0.5 (consistency — rewards quality)
+   * + current_streak × 5   (momentum — rewards active streaks)
+   * + longest_streak × 2   (history — rewards past dedication)
    */
   async getGlobal({ sortBy = 'discipline_score', period = 'all', limit = 50 } = {}) {
-    // 1. Try the leaderboard_view first (most efficient)
-    if (period === 'all') {
-      const { data: viewData, error: viewErr } = await supabase
-        .from('leaderboard_view')
-        .select('*')
-        .order(sortBy, { ascending: false, nullsFirst: false })
-        .limit(limit)
-
-      if (!viewErr && viewData?.length > 0) {
-        // View may not have email — fetch profiles for name fallback
-        const uids = viewData.map(r => r.user_id).filter(Boolean)
-        const profileMap = {}
-        if (uids.length > 0) {
-          const { data: profiles } = await supabase
-            .from('profiles')
-            .select('id, name, email, avatar_url')
-            .in('id', uids)
-          for (const p of (profiles || [])) profileMap[p.id] = p
-        }
-        return viewData.map((row, i) => ({
-          rank: i + 1,
-          user_id: row.user_id,
-          display_name: displayName(profileMap[row.user_id] || row),
-          avatar_url: row.avatar_url || profileMap[row.user_id]?.avatar_url,
-          discipline_score: row.discipline_score || 0,
-          current_streak: row.current_streak || 0,
-          longest_streak: row.longest_streak || 0,
-          attendance_rate: row.attendance_rate || 0,
-          total_approved: row.total_approved || 0,
-          total_days: row.total_submissions || 0,
-          achievements_count: row.achievements_count || 0
-        }))
-      }
-    }
-
-    // 2. Fallback / period-filtered: compute from raw attendance
+    // 1. Fetch all attendance (with optional period filter)
     let attendanceQuery = supabase
       .from('attendance')
       .select('user_id, date, status')
@@ -99,7 +70,7 @@ export const leaderboardService = {
     const { data: attendance, error: attErr } = await attendanceQuery
     if (attErr) throw new Error(attErr.message)
 
-    // Aggregate per user
+    // 2. Aggregate per user
     const userMap = {}
     for (const rec of (attendance || [])) {
       if (!userMap[rec.user_id]) {
@@ -112,102 +83,72 @@ export const leaderboardService = {
       }
     }
 
-    const userIds = Object.keys(userMap)
-    if (userIds.length === 0) {
-      // No attendance — show all users with zero stats
-      const { data: allProfiles } = await supabase
-        .from('profiles')
-        .select('id, name, email, avatar_url')
-        .limit(limit)
-
-      return (allProfiles || []).map((p, i) => ({
-        rank: i + 1,
-        user_id: p.id,
-        display_name: displayName(p),
-        avatar_url: p.avatar_url,
-        discipline_score: 0, current_streak: 0, longest_streak: 0,
-        attendance_rate: 0, total_approved: 0, total_days: 0
-      }))
-    }
-
-    // Get profiles
-    const { data: profiles } = await supabase
+    // 3. Get ALL profiles (so even users with 0 attendance appear)
+    const { data: allProfiles } = await supabase
       .from('profiles')
-      .select('id, name, email, avatar_url, current_streak, longest_streak, total_discipline_points')
-      .in('id', userIds)
+      .select('id, name, email, avatar_url')
 
     const profileMap = {}
-    for (const p of (profiles || [])) profileMap[p.id] = p
+    for (const p of (allProfiles || [])) profileMap[p.id] = p
 
-    // Build leaderboard entries
-    const entries = userIds.map(uid => {
-      const stats = userMap[uid]
+    // Merge: users with attendance + users without
+    const allUserIds = new Set([
+      ...Object.keys(userMap),
+      ...(allProfiles || []).map(p => p.id)
+    ])
+
+    // 4. Build leaderboard entries with real computed scores
+    const entries = [...allUserIds].map(uid => {
+      const stats = userMap[uid] || { approved: 0, total: 0, approvedDates: [] }
       const profile = profileMap[uid] || {}
-      const sortedDates = stats.approvedDates.sort()
+      const sortedDates = [...stats.approvedDates].sort()
       const streaks = computeStreaks(sortedDates)
-      const rate = stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0
+      const rate = stats.total > 0 ? Math.round((stats.approved / stats.total) * 1000) / 10 : 0
 
-      // Discipline score: use DB value if available, otherwise compute from attendance
-      const dbScore = profile.total_discipline_points || 0
-      const computedScore = (stats.approved * 10) + (streaks.currentStreak * 5)
-      const score = dbScore > 0 ? dbScore : computedScore
+      // Discipline Score = volume + consistency + momentum + history
+      const score = Math.round(
+        (stats.approved * 10) +
+        (rate * 0.5) +
+        (streaks.currentStreak * 5) +
+        (streaks.bestStreak * 2)
+      )
 
       return {
         user_id: uid,
         display_name: displayName(profile),
         avatar_url: profile.avatar_url,
         discipline_score: score,
-        current_streak: profile.current_streak || streaks.currentStreak,
-        longest_streak: profile.longest_streak || streaks.bestStreak,
+        current_streak: streaks.currentStreak,
+        longest_streak: streaks.bestStreak,
         attendance_rate: rate,
         total_approved: stats.approved,
         total_days: stats.total
       }
     })
 
-    // Sort
+    // 5. Sort and rank
     entries.sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0))
 
     return entries.slice(0, limit).map((e, i) => ({ rank: i + 1, ...e }))
   },
 
   /**
-   * Get room-specific leaderboard
+   * Get room-specific leaderboard — computed from raw attendance data
    */
   async getForRoom(roomId) {
-    // Try view first
-    const { data: viewData, error: viewErr } = await supabase
-      .from('room_leaderboard_view')
-      .select('*')
-      .eq('room_id', roomId)
-      .order('attendance_rate', { ascending: false, nullsFirst: false })
-      .limit(20)
-
-    if (!viewErr && viewData?.length > 0) {
-      return viewData.map((row, i) => ({
-        rank: i + 1,
-        user_id: row.user_id,
-        display_name: row.name || 'Anonymous',
-        avatar_url: row.avatar_url,
-        attendance_rate: row.attendance_rate || 0,
-        approved_count: row.approved_count || 0,
-        total_count: row.total_count || 0,
-        current_streak: row.current_streak || 0,
-        total_days: row.total_count || 0
-      }))
-    }
-
-    // Fallback: compute from raw data
     const { data: attendance } = await supabase
       .from('attendance')
-      .select('user_id, status')
+      .select('user_id, date, status')
       .eq('room_id', roomId)
 
     const userMap = {}
     for (const r of (attendance || [])) {
-      if (!userMap[r.user_id]) userMap[r.user_id] = { approved: 0, total: 0 }
+      if (!userMap[r.user_id]) userMap[r.user_id] = { approved: 0, total: 0, approvedDates: [] }
       userMap[r.user_id].total++
-      if (r.status === 'approved') userMap[r.user_id].approved++
+      if (r.status === 'approved') {
+        userMap[r.user_id].approved++
+        userMap[r.user_id].approvedDates.push(r.date)
+      }
     }
 
     const userIds = Object.keys(userMap)
@@ -215,7 +156,7 @@ export const leaderboardService = {
 
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, name, email, avatar_url, current_streak')
+      .select('id, name, email, avatar_url')
       .in('id', userIds)
 
     const profileMap = {}
@@ -225,6 +166,9 @@ export const leaderboardService = {
       .map(uid => {
         const stats = userMap[uid]
         const p = profileMap[uid] || {}
+        const sortedDates = [...stats.approvedDates].sort()
+        const streaks = computeStreaks(sortedDates)
+        const rate = stats.total > 0 ? Math.round((stats.approved / stats.total) * 1000) / 10 : 0
         return {
           user_id: uid,
           display_name: displayName(p),
@@ -232,8 +176,12 @@ export const leaderboardService = {
           approved_count: stats.approved,
           total_count: stats.total,
           total_days: stats.total,
-          attendance_rate: stats.total > 0 ? Math.round(stats.approved / stats.total * 100) : 0,
-          current_streak: p.current_streak || 0
+          attendance_rate: rate,
+          current_streak: streaks.currentStreak,
+          longest_streak: streaks.bestStreak,
+          discipline_score: Math.round(
+            (stats.approved * 10) + (rate * 0.5) + (streaks.currentStreak * 5) + (streaks.bestStreak * 2)
+          )
         }
       })
       .sort((a, b) => b.attendance_rate - a.attendance_rate)
