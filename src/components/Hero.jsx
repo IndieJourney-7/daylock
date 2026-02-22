@@ -100,8 +100,8 @@ function Hero() {
                 <div className="relative mx-auto max-w-sm">
                   <div className="rounded-3xl border-2 border-charcoal-400/20 bg-charcoal-800/80 p-3 shadow-2xl shadow-accent/10">
                     <img 
-                      src="/Assets/Userdashboard.png" 
-                      alt="Daylock dashboard — rooms, streaks, discipline score and live countdowns"
+                      src="/Assets/dayblocks.png" 
+                      alt="Daylock — Gym, Work, and Attendance rooms with lock icons"
                       className="w-full rounded-2xl"
                     />
                   </div>
