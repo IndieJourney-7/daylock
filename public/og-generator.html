@@ -1,0 +1,239 @@
+<!--
+  OG IMAGE GENERATOR
+  Open this file in a browser, screenshot at exactly 1200×630,
+  then save as public/Assets/og-cover.png
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  body {
+    width: 1200px;
+    height: 630px;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #0a0a0a;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Subtle gradient overlay */
+  .bg-glow {
+    position: absolute;
+    width: 700px;
+    height: 700px;
+    border-radius: 50%;
+    filter: blur(160px);
+    opacity: 0.15;
+  }
+  .glow-1 { top: -200px; right: -100px; background: #22c55e; }
+  .glow-2 { bottom: -300px; left: -100px; background: #22c55e; }
+
+  .container {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    padding: 60px 70px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .left {
+    max-width: 620px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    padding: 8px 18px;
+    border-radius: 100px;
+    width: fit-content;
+  }
+  .badge-dot {
+    width: 8px;
+    height: 8px;
+    background: #22c55e;
+    border-radius: 50%;
+  }
+  .badge-text {
+    color: #22c55e;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  h1 {
+    font-size: 64px;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #fff;
+    letter-spacing: -1px;
+  }
+  h1 .green {
+    background: linear-gradient(135deg, #22c55e, #4ade80);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    font-size: 22px;
+    color: #9ca3af;
+    line-height: 1.5;
+    font-weight: 400;
+    max-width: 520px;
+  }
+
+  .url {
+    font-size: 18px;
+    color: #22c55e;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-top: 10px;
+  }
+
+  /* Right side — app visual */
+  .right {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-right: 20px;
+  }
+
+  .room-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 16px 24px;
+    width: 320px;
+  }
+  .room-card.active {
+    background: linear-gradient(135deg, #0d3320, #064e28);
+    border-color: rgba(34, 197, 94, 0.3);
+  }
+
+  .room-name {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .room-time {
+    color: #6b7280;
+    font-size: 13px;
+    margin-top: 2px;
+  }
+  .room-card.active .room-time { color: #86efac; }
+
+  .lock-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .lock-icon.green {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+  }
+  .lock-icon.gray {
+    background: rgba(255,255,255,0.06);
+    color: #6b7280;
+  }
+
+  /* Floating stats */
+  .stat-badge {
+    position: absolute;
+    padding: 10px 16px;
+    background: #1a1a2e;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stat-badge.streak {
+    top: -20px;
+    right: -40px;
+  }
+  .stat-badge.verified {
+    bottom: -20px;
+    left: -40px;
+  }
+  .stat-emoji { font-size: 20px; }
+  .stat-label { color: #fff; font-size: 14px; font-weight: 700; }
+  .stat-sub { color: #6b7280; font-size: 11px; }
+</style>
+</head>
+<body>
+  <div class="bg-glow glow-1"></div>
+  <div class="bg-glow glow-2"></div>
+
+  <div class="container">
+    <div class="left">
+      <div class="badge">
+        <div class="badge-dot"></div>
+        <span class="badge-text">Accountability, Reimagined</span>
+      </div>
+      <h1>Stop Planning.<br><span class="green">Start Proving.</span></h1>
+      <p class="subtitle">
+        The app where someone else holds the keys.
+        Lock your day, submit proof, build streaks — or get locked out.
+      </p>
+      <p class="url">daylock.vercel.app</p>
+    </div>
+
+    <div class="right">
+      <div class="room-card active">
+        <div>
+          <div class="room-name">Gym</div>
+          <div class="room-time">6:00 AM – 7:00 AM</div>
+        </div>
+        <div class="lock-icon green">🔓</div>
+      </div>
+      <div class="room-card">
+        <div>
+          <div class="room-name">Work</div>
+          <div class="room-time">9:00 AM – 1:00 PM</div>
+        </div>
+        <div class="lock-icon gray">🔒</div>
+      </div>
+      <div class="room-card">
+        <div>
+          <div class="room-name">Study</div>
+          <div class="room-time">4:00 PM – 5:00 PM</div>
+        </div>
+        <div class="lock-icon gray">🔒</div>
+      </div>
+
+      <div class="stat-badge streak">
+        <span class="stat-emoji">🔥</span>
+        <div>
+          <div class="stat-label">12-Day Streak</div>
+          <div class="stat-sub">Don't break it</div>
+        </div>
+      </div>
+      <div class="stat-badge verified">
+        <span class="stat-emoji">✅</span>
+        <div>
+          <div class="stat-label">Proof Verified</div>
+          <div class="stat-sub">Gym photo approved</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
