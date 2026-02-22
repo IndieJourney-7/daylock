@@ -148,7 +148,7 @@ export default function AdminAnalytics() {
     if (!data) return
     setExporting('pdf')
     try { exportAdminPDF(data, user?.email || 'Admin') }
-    catch (e) { console.error(e) }
+    catch (e) { console.error('PDF export failed:', e); alert('Export failed. Check console for details.') }
     finally { setTimeout(() => setExporting(null), 1000) }
   }
 
@@ -156,17 +156,14 @@ export default function AdminAnalytics() {
     if (!data) return
     setExporting('excel')
     try {
-      const rows = (data.records || []).map(r => ({
-        ...r,
-        roomName: r.room?.name || '-',
-        userName: r.user?.name || r.user?.email || '-'
-      }))
       const extraData = {
         overview: data.overview,
-        weeklyTrend: data.weeklyTrend
+        weeklyTrend: data.weeklyTrend,
+        userPerformance: data.userPerformance,
+        roomStats: data.roomStats
       }
-      exportToExcel(rows, 'daylock-admin-report', extraData)
-    } catch (e) { console.error(e) }
+      exportToExcel(data.records || [], 'daylock-admin-report', extraData)
+    } catch (e) { console.error('Excel export failed:', e); alert('Export failed. Check console for details.') }
     finally { setTimeout(() => setExporting(null), 1000) }
   }
 

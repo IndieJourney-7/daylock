@@ -142,7 +142,7 @@ function RoomDetail({ roomId, onBack }) {
         records: data.records?.map(r => ({ ...r, room: data.room }))
       }
       exportToPDF(exportData, `${data.room.emoji} ${data.room.name}`, `daylock-${data.room.name.toLowerCase().replace(/\s+/g, '-')}-report`)
-    } catch (e) { console.error('PDF export failed:', e) }
+    } catch (e) { console.error('PDF export failed:', e); alert('Export failed. Check console for details.') }
     finally { setTimeout(() => setExporting(null), 1000) }
   }
 
@@ -150,15 +150,16 @@ function RoomDetail({ roomId, onBack }) {
     if (!data) return
     setExporting('excel')
     try {
-      const rows = (data.records || []).map(r => ({ ...r, roomName: data.room.name }))
+      const rows = (data.records || []).map(r => ({ ...r, room: data.room }))
       const extraData = {
         overview: { ...data.overview, overallRate: data.overview.rate },
         streaks: data.streaks,
+        roomBreakdown: [{ ...data.room, total: data.overview.totalDays, approved: data.overview.approved, rejected: data.overview.rejected, missed: data.overview.missed, rate: data.overview.rate }],
         weeklyTrend: data.weeklyTrend,
         monthlyTrend: data.monthlyTrend
       }
       exportToExcel(rows, `daylock-${data.room.name.toLowerCase().replace(/\s+/g, '-')}-report`, extraData)
-    } catch (e) { console.error('Excel export failed:', e) }
+    } catch (e) { console.error('Excel export failed:', e); alert('Export failed. Check console for details.') }
     finally { setTimeout(() => setExporting(null), 1000) }
   }
 

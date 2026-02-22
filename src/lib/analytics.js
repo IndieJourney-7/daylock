@@ -193,10 +193,16 @@ export async function getAdminAnalytics() {
     .order('date', { ascending: true })
 
   if (error) throw new Error(error.message)
-  const all = records || []
+
+  // Enrich records with room & user info for exports
+  const all = (records || []).map(r => ({
+    ...r,
+    room: roomMap[r.room_id] || null,
+    user: profileMap[r.user_id] || null
+  }))
 
   // 3. Get profiles for users in these rooms
-  const allUserIds = [...new Set(all.map(r => r.user_id))]
+  const allUserIds = [...new Set((records || []).map(r => r.user_id))]
   const profileMap = {}
   if (allUserIds.length > 0) {
     const { data: profiles } = await supabase

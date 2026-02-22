@@ -36,14 +36,17 @@ export function exportToExcel(records, fileName = 'daylock-report', extraData = 
   const wb = XLSX.utils.book_new()
 
   // ── Sheet 1: Attendance Log (all records) ──
-  const logRows = (records || []).map(r => ({
-    Date: r.date,
-    Room: r.room?.name || r.roomName || '-',
-    Status: r.status?.replace('_', ' ') || '-',
-    'Submitted At': r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '-',
-    'Reviewed At': r.reviewed_at ? new Date(r.reviewed_at).toLocaleString() : '-',
-    Note: r.note || '-'
-  }))
+  const hasUserInfo = (records || []).some(r => r.user || r.userName)
+  const logRows = (records || []).map(r => {
+    const row = { Date: r.date }
+    if (hasUserInfo) row['User'] = r.user?.name || r.user?.email || r.userName || '-'
+    row['Room'] = r.room?.name || r.roomName || '-'
+    row['Status'] = r.status?.replace('_', ' ') || '-'
+    row['Submitted At'] = r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '-'
+    row['Reviewed At'] = r.reviewed_at ? new Date(r.reviewed_at).toLocaleString() : '-'
+    row['Note'] = r.note || '-'
+    return row
+  })
 
   if (logRows.length > 0) {
     const ws1 = XLSX.utils.json_to_sheet(logRows)
@@ -118,6 +121,40 @@ export function exportToExcel(records, fileName = 'daylock-report', extraData = 
     const ws5 = XLSX.utils.json_to_sheet(monthRows)
     ws5['!cols'] = [{ wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }]
     XLSX.utils.book_append_sheet(wb, ws5, 'Monthly Trend')
+  }
+
+  // ── Sheet: User Performance (admin exports) ──
+  if (extraData.userPerformance?.length > 0) {
+    const upRows = extraData.userPerformance.map((u, i) => ({
+      Rank: i + 1,
+      User: u.name || 'Unknown',
+      'Total Days': u.total,
+      Approved: u.approved,
+      Rejected: u.rejected ?? 0,
+      Missed: u.missed ?? 0,
+      'Rate (%)': u.rate,
+      Grade: getGrade(u.rate),
+      'Current Streak': u.currentStreak ?? 0,
+      'Best Streak': u.bestStreak ?? 0
+    }))
+    const wsUp = XLSX.utils.json_to_sheet(upRows)
+    wsUp['!cols'] = Object.keys(upRows[0]).map(key => ({ wch: Math.max(key.length + 2, 12) }))
+    XLSX.utils.book_append_sheet(wb, wsUp, 'User Performance')
+  }
+
+  // ── Sheet: Room Stats (admin exports) ──
+  if (extraData.roomStats?.length > 0) {
+    const rsRows = extraData.roomStats.map(r => ({
+      Room: `${r.emoji || ''} ${r.name}`.trim(),
+      Owner: r.userName || '-',
+      'Total Days': r.total,
+      Approved: r.approved,
+      'Rate (%)': r.rate,
+      Grade: getGrade(r.rate)
+    }))
+    const wsRs = XLSX.utils.json_to_sheet(rsRows)
+    wsRs['!cols'] = Object.keys(rsRows[0]).map(key => ({ wch: Math.max(key.length + 2, 12) }))
+    XLSX.utils.book_append_sheet(wb, wsRs, 'Room Stats')
   }
 
   const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
@@ -399,14 +436,15 @@ export function exportAdminPDF(analytics, adminName = 'Admin', fileName = 'daylo
 
     const logRows = [...analytics.records].reverse().map(r => [
       r.date,
-      r.user?.name || r.user?.email || '-',
+      r.user?.name || r.user?.email || r.userName || '-',
+      r.room?.name || r.roomName || '-',
       r.status?.replace('_', ' ') || '-',
       r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '-'
     ])
 
     doc.autoTable({
       startY: y + 4,
-      head: [['Date', 'User', 'Status', 'Submitted']],
+      head: [['Date', 'User', 'Room', 'Status', 'Submitted']],
       body: logRows,
       theme: 'striped',
       headStyles: { fillColor: [139, 92, 246] },

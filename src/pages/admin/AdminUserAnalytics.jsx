@@ -137,7 +137,7 @@ export default function AdminUserAnalytics() {
     setExporting('pdf')
     try {
       exportToPDF(data, data.user?.name || data.user?.email || 'User', `daylock-${(data.user?.name || 'user').toLowerCase().replace(/\s+/g, '-')}-report`)
-    } catch (e) { console.error('PDF export failed:', e) }
+    } catch (e) { console.error('PDF export failed:', e); alert('Export failed. Check console for details.') }
     finally { setTimeout(() => setExporting(null), 1000) }
   }
 
@@ -153,7 +153,7 @@ export default function AdminUserAnalytics() {
         monthlyTrend: data.monthlyTrend
       }
       exportToExcel(data.records || [], `daylock-${(data.user?.name || 'user').toLowerCase().replace(/\s+/g, '-')}-report`, extraData)
-    } catch (e) { console.error('Excel export failed:', e) }
+    } catch (e) { console.error('Excel export failed:', e); alert('Export failed. Check console for details.') }
     finally { setTimeout(() => setExporting(null), 1000) }
   }
 
