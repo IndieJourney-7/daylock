@@ -268,6 +268,27 @@ function AdminRoomDetail() {
     try { await resolveConsequence(consequenceId) } catch (err) { console.error('Resolve failed:', err) }
   }
   
+  // Group rules by group_title for structured display
+  // MUST be before any early returns (React rules of hooks)
+  const groupedRules = useMemo(() => {
+    const ungrouped = rules.filter(r => !r.group_title)
+    const groupMap = {}
+    rules.filter(r => r.group_title).forEach(r => {
+      if (!groupMap[r.group_title]) {
+        groupMap[r.group_title] = { title: r.group_title, groupSort: r.group_sort || 0, items: [] }
+      }
+      // Skip placeholder items (used to create the group)
+      if (r.text !== '(group placeholder)') {
+        groupMap[r.group_title].items.push(r)
+      } else {
+        // Keep track of the placeholder for deletion
+        groupMap[r.group_title].placeholderId = r.id
+      }
+    })
+    const groups = Object.values(groupMap).sort((a, b) => a.groupSort - b.groupSort)
+    return { ungrouped, groups }
+  }, [rules])
+  
   if (loading || rulesLoading) return <DetailSkeleton />
   
   if (error || !room) {
@@ -288,26 +309,6 @@ function AdminRoomDetail() {
   const userEmail = room.assignedBy?.email || room.user?.email || ''
   const userAvatar = room.assignedBy?.avatar_url || room.user?.avatar_url
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase()
-  
-  // Group rules by group_title for structured display
-  const groupedRules = useMemo(() => {
-    const ungrouped = rules.filter(r => !r.group_title)
-    const groupMap = {}
-    rules.filter(r => r.group_title).forEach(r => {
-      if (!groupMap[r.group_title]) {
-        groupMap[r.group_title] = { title: r.group_title, groupSort: r.group_sort || 0, items: [] }
-      }
-      // Skip placeholder items (used to create the group)
-      if (r.text !== '(group placeholder)') {
-        groupMap[r.group_title].items.push(r)
-      } else {
-        // Keep track of the placeholder for deletion
-        groupMap[r.group_title].placeholderId = r.id
-      }
-    })
-    const groups = Object.values(groupMap).sort((a, b) => a.groupSort - b.groupSort)
-    return { ungrouped, groups }
-  }, [rules])
   
   const stats = {
     streak: room.stats?.streak || 0,
