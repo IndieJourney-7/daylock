@@ -7,6 +7,15 @@
 import { supabase } from './supabase'
 
 /**
+ * Get display name from profile — name or email username
+ */
+function displayName(profile) {
+  if (profile?.name) return profile.name
+  if (profile?.email) return profile.email.split('@')[0]
+  return 'Anonymous'
+}
+
+/**
  * Compute streaks from sorted date strings
  */
 function computeStreaks(sortedDates) {
@@ -47,11 +56,21 @@ export const leaderboardService = {
         .limit(limit)
 
       if (!viewErr && viewData?.length > 0) {
+        // View may not have email — fetch profiles for name fallback
+        const uids = viewData.map(r => r.user_id).filter(Boolean)
+        const profileMap = {}
+        if (uids.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, name, email, avatar_url')
+            .in('id', uids)
+          for (const p of (profiles || [])) profileMap[p.id] = p
+        }
         return viewData.map((row, i) => ({
           rank: i + 1,
           user_id: row.user_id,
-          display_name: row.name || 'Anonymous',
-          avatar_url: row.avatar_url,
+          display_name: displayName(profileMap[row.user_id] || row),
+          avatar_url: row.avatar_url || profileMap[row.user_id]?.avatar_url,
           discipline_score: row.discipline_score || 0,
           current_streak: row.current_streak || 0,
           longest_streak: row.longest_streak || 0,
@@ -98,13 +117,13 @@ export const leaderboardService = {
       // No attendance — show all users with zero stats
       const { data: allProfiles } = await supabase
         .from('profiles')
-        .select('id, name, avatar_url')
+        .select('id, name, email, avatar_url')
         .limit(limit)
 
       return (allProfiles || []).map((p, i) => ({
         rank: i + 1,
         user_id: p.id,
-        display_name: p.name || 'Anonymous',
+        display_name: displayName(p),
         avatar_url: p.avatar_url,
         discipline_score: 0, current_streak: 0, longest_streak: 0,
         attendance_rate: 0, total_approved: 0, total_days: 0
@@ -114,7 +133,7 @@ export const leaderboardService = {
     // Get profiles
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, name, avatar_url, current_streak, longest_streak, total_discipline_points')
+      .select('id, name, email, avatar_url, current_streak, longest_streak, total_discipline_points')
       .in('id', userIds)
 
     const profileMap = {}
@@ -135,7 +154,7 @@ export const leaderboardService = {
 
       return {
         user_id: uid,
-        display_name: profile.name || 'Anonymous',
+        display_name: displayName(profile),
         avatar_url: profile.avatar_url,
         discipline_score: score,
         current_streak: profile.current_streak || streaks.currentStreak,
@@ -196,7 +215,7 @@ export const leaderboardService = {
 
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, name, avatar_url, current_streak')
+      .select('id, name, email, avatar_url, current_streak')
       .in('id', userIds)
 
     const profileMap = {}
@@ -208,7 +227,7 @@ export const leaderboardService = {
         const p = profileMap[uid] || {}
         return {
           user_id: uid,
-          display_name: p.name || 'Anonymous',
+          display_name: displayName(p),
           avatar_url: p.avatar_url,
           approved_count: stats.approved,
           total_count: stats.total,
