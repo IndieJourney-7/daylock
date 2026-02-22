@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react'
 import { useRoomReminders, usePushSubscription } from '../../hooks'
 import { remindersService, REMINDER_PRESETS } from '../../lib/reminders'
+import { api } from '../../lib/api'
 
 function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
   const { reminders, loading, setReminders } = useRoomReminders(roomId)
@@ -18,6 +19,9 @@ function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
   const [customMinutes, setCustomMinutes] = useState('')
   const [saving, setSaving] = useState(false)
   const [subscribing, setSubscribing] = useState(false)
+  const [saveError, setSaveError] = useState(null)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [testing, setTesting] = useState(false)
 
   // Sync selected from DB data
   useEffect(() => {
@@ -26,14 +30,71 @@ function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
     }
   }, [reminders])
 
+  /**
+   * Request basic notification permission (needed for client-side reminders)
+   * This is separate from push subscription — works even without VAPID
+   */
+  const ensureNotificationPermission = async () => {
+    if (!('Notification' in window)) return 'unsupported'
+    if (Notification.permission === 'granted') return 'granted'
+    if (Notification.permission === 'denied') return 'denied'
+    return await Notification.requestPermission()
+  }
+
   const handleEnablePush = async () => {
     setSubscribing(true)
     try {
+      // First ensure basic notification permission
+      const perm = await ensureNotificationPermission()
+      if (perm !== 'granted') {
+        return
+      }
+      // Then try full push subscription (may fail if VAPID not configured)
       await subscribe()
     } catch (err) {
       console.error('Failed to enable push:', err)
     } finally {
       setSubscribing(false)
+    }
+  }
+
+  const handleTestNotification = async () => {
+    setTesting(true)
+    try {
+      // Ensure permission first
+      const perm = await ensureNotificationPermission()
+      if (perm !== 'granted') {
+        setSaveError('Please allow notifications when prompted')
+        setTimeout(() => setSaveError(null), 3000)
+        setTesting(false)
+        return
+      }
+
+      // Try server-side test push first
+      if (isSubscribed) {
+        try {
+          await api.notifications.testPush()
+          setTesting(false)
+          return
+        } catch {
+          // Fall through to client-side
+        }
+      }
+
+      // Client-side test notification
+      const roomLabel = roomEmoji ? `${roomEmoji} ${roomName}` : roomName
+      remindersService.showNotification(
+        `${roomLabel || 'Room'} — Test Reminder`,
+        {
+          body: 'Notifications are working! You\'ll get alerts before your room opens.',
+          tag: 'test-reminder'
+        }
+      )
+    } catch (err) {
+      setSaveError('Failed to send test notification')
+      setTimeout(() => setSaveError(null), 3000)
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -56,10 +117,29 @@ function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
 
   const handleSave = async () => {
     setSaving(true)
+    setSaveError(null)
+    setSaveSuccess(false)
     try {
+      // Request notification permission if not yet granted
+      const perm = await ensureNotificationPermission()
+      if (perm === 'denied') {
+        setSaveError('Notifications are blocked. Please enable them in your browser settings.')
+        setSaving(false)
+        return
+      }
+
       await setReminders(selected)
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+
+      // If push not subscribed yet but permission granted, try subscribing in background
+      if (!isSubscribed && perm === 'granted') {
+        subscribe().catch(() => {}) // Silent — push is best-effort
+      }
     } catch (err) {
       console.error('Failed to save reminders:', err)
+      setSaveError('Failed to save reminders. Please try again.')
+      setTimeout(() => setSaveError(null), 5000)
     } finally {
       setSaving(false)
     }
@@ -137,6 +217,18 @@ function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
               <p className="text-green-400 text-xs font-medium">
                 Push enabled — you'll get alerts even when the app is closed
               </p>
+            </div>
+          )}
+
+          {/* Error/Success feedback */}
+          {saveError && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2.5 text-center">
+              <p className="text-red-400 text-xs">{saveError}</p>
+            </div>
+          )}
+          {saveSuccess && (
+            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2.5 text-center">
+              <p className="text-green-400 text-xs">✓ Reminders saved successfully!</p>
             </div>
           )}
 
@@ -231,11 +323,22 @@ function RoomReminderSettings({ roomId, roomName, roomEmoji }) {
                 </button>
               )}
 
+              {/* Test notification button */}
+              {selected.length > 0 && !hasChanges && (
+                <button
+                  onClick={handleTestNotification}
+                  disabled={testing}
+                  className="w-full bg-charcoal-500/30 hover:bg-charcoal-500/50 border border-charcoal-400/20 text-gray-300 text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {testing ? 'Sending...' : '🧪 Send Test Notification'}
+                </button>
+              )}
+
               {/* Info note */}
               <p className="text-gray-600 text-[10px] text-center">
                 {isSubscribed
                   ? 'Push notifications enabled — you\'ll get alerts even when the app is closed.'
-                  : 'Enable push notifications above to get alerts even when the app is closed.'}
+                  : 'Reminders work when the app is open. Enable push notifications above for alerts even when closed.'}
               </p>
             </>
           )}

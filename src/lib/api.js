@@ -339,7 +339,8 @@ export const api = {
     unsubscribePush: (endpoint) => request('/api/notifications/push/subscribe', {
       method: 'DELETE',
       body: JSON.stringify({ endpoint })
-    })
+    }),
+    testPush: () => request('/api/notifications/push/test', { method: 'POST' })
   },
 
   // Room Reminders
@@ -348,11 +349,11 @@ export const api = {
     getForRoom: (roomId) => request(`/api/reminders/room/${roomId}`),
     setForRoom: (roomId, minutesBefore) => request(`/api/reminders/room/${roomId}`, {
       method: 'PUT',
-      body: JSON.stringify({ minutesBefore })
+      body: JSON.stringify({ minutesBefore, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone })
     }),
     add: (roomId, minutesBefore) => request('/api/reminders', {
       method: 'POST',
-      body: JSON.stringify({ roomId, minutesBefore })
+      body: JSON.stringify({ roomId, minutesBefore, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone })
     }),
     remove: (id) => request(`/api/reminders/${id}`, { method: 'DELETE' }),
     toggle: (id, enabled) => request(`/api/reminders/${id}/toggle`, {
