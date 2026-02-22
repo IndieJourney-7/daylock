@@ -24,6 +24,7 @@ import {
 import { AchievementToastManager } from '../components/social/AchievementToast'
 import { LeaderboardTable } from '../components/social'
 import { ActivityFeed } from '../components/social/ActivityFeedItem'
+import { WelcomeFlow, shouldShowWelcome, SmartInstallBanner } from '../components/onboarding'
 import { useAuth } from '../contexts'
 import { useRooms, useUnnotifiedAchievements, useLeaderboard, useActivityFeed } from '../hooks'
 import { roomsService } from '../lib'
@@ -102,6 +103,7 @@ function Dashboard() {
   const { user, profile } = useAuth()
   const { data: rooms, loading: roomsLoading, error } = useRooms(user?.id)
   const [showConfrontation, setShowConfrontation] = useState(true)
+  const [showWelcome, setShowWelcome] = useState(() => shouldShowWelcome())
 
   // ─── Direct Supabase: today's attendance per room ───
   const [todayAttendance, setTodayAttendance] = useState({})
@@ -250,6 +252,14 @@ function Dashboard() {
   
   return (
     <div className="max-w-4xl mx-auto space-y-5 md:space-y-6">
+      {/* First-time Welcome Flow */}
+      {showWelcome && (
+        <WelcomeFlow onComplete={() => setShowWelcome(false)} />
+      )}
+
+      {/* PWA Smart Install Banner */}
+      <SmartInstallBanner />
+
       {/* Phase 1: Miss Confrontation Overlay */}
       {missData.hasMissedToday && showConfrontation && (
         <MissConfrontation 

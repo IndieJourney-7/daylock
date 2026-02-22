@@ -242,18 +242,39 @@ function Rooms() {
       
       {/* Empty state */}
       {roomsWithStatus.length === 0 && (
-        <Card className="text-center py-12">
-          <div className="w-16 h-16 rounded-full bg-charcoal-500/50 flex items-center justify-center mx-auto mb-4">
-            <Icon name="rooms" className="w-8 h-8 text-gray-500" />
+        <Card className="text-center py-10 px-6">
+          <div className="w-20 h-20 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-5">
+            <span className="text-4xl">🚪</span>
           </div>
-          <h3 className="text-white font-medium mb-2">No rooms yet</h3>
-          <p className="text-gray-500 text-sm mb-4">Create your first room and invite an admin</p>
-          <Button onClick={() => setShowCreateModal(true)}>
+          <h3 className="text-xl font-bold text-white mb-2">Create Your First Room</h3>
+          <p className="text-gray-400 text-sm mb-6 max-w-xs mx-auto">
+            Pick a habit — gym, work, study, reading — set a time window, and invite someone to hold you accountable.
+          </p>
+          <Button onClick={() => setShowCreateModal(true)} size="lg" className="shadow-glow mb-6">
             <span className="flex items-center gap-2">
-              <Icon name="plus" className="w-4 h-4" />
+              <Icon name="plus" className="w-5 h-5" />
               Create Room
             </span>
           </Button>
+          
+          {/* Quick examples */}
+          <div className="grid grid-cols-3 gap-2 max-w-sm mx-auto">
+            {[
+              { emoji: '🏋️', name: 'Gym', time: '6–7 AM' },
+              { emoji: '💼', name: 'Work', time: '9 AM–1 PM' },
+              { emoji: '📖', name: 'Study', time: '7–9 PM' },
+            ].map(ex => (
+              <button
+                key={ex.name}
+                onClick={() => setShowCreateModal(true)}
+                className="p-3 rounded-xl bg-charcoal-500/20 border border-charcoal-400/10 hover:border-accent/30 transition-colors text-center"
+              >
+                <div className="text-2xl mb-1">{ex.emoji}</div>
+                <p className="text-white text-xs font-medium">{ex.name}</p>
+                <p className="text-gray-600 text-[10px]">{ex.time}</p>
+              </button>
+            ))}
+          </div>
         </Card>
       )}
       
