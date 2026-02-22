@@ -16,8 +16,8 @@ export const rulesService = {
   /**
    * Add a rule to a room
    */
-  async addRule(roomId, text) {
-    return api.rules.add(roomId, text)
+  async addRule(roomId, text, groupTitle, groupSort) {
+    return api.rules.add(roomId, text, groupTitle, groupSort)
   },
 
   /**

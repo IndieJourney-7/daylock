@@ -49,6 +49,9 @@ function AdminRoomDetail() {
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
   const [newRule, setNewRule] = useState('')
+  const [newGroupTitle, setNewGroupTitle] = useState('')
+  const [addingToGroup, setAddingToGroup] = useState(null) // group_title being added to
+  const [newGroupItem, setNewGroupItem] = useState('')
   const [timeWindow, setTimeWindow] = useState({ start: '06:00', end: '07:00' })
   const [isSaving, setIsSaving] = useState(false)
   const [isTogglingPause, setIsTogglingPause] = useState(false)
@@ -61,7 +64,7 @@ function AdminRoomDetail() {
   const [isMarkingAbsent, setIsMarkingAbsent] = useState(false)
   
   // Hooks
-  const { rules, loading: rulesLoading, addRule: addRuleToDb, toggleRule: toggleRuleInDb, deleteRule: deleteRuleFromDb } = useRoomRules(roomId)
+  const { rules, loading: rulesLoading, addRule: addRuleToDb, updateRule: updateRuleInDb, toggleRule: toggleRuleInDb, deleteRule: deleteRuleFromDb } = useRoomRules(roomId)
   const { proofs, loading: proofsLoading, approve, reject, refetch: refetchProofs } = usePendingProofs(roomId)
   const { warnings: storedWarnings, loading: warningsLoading, refetch: refetchWarnings, dismiss: dismissWarning } = useRoomWarnings(roomId)
   const { consequences, loading: consequencesLoading, refetch: refetchConsequences, resolve: resolveConsequence } = useRoomConsequences(roomId)
@@ -103,12 +106,40 @@ function AdminRoomDetail() {
     try { await addRuleToDb(newRule.trim()); setNewRule('') } catch (err) { console.error('Failed to add rule:', err) }
   }
   
+  const handleAddGroup = async () => {
+    if (!newGroupTitle.trim()) return
+    try {
+      // Find max group_sort
+      const maxGroupSort = rules.reduce((max, r) => Math.max(max, r.group_sort || 0), -1) + 1
+      await addRuleToDb('(group placeholder)', newGroupTitle.trim(), maxGroupSort)
+      setNewGroupTitle('')
+    } catch (err) { console.error('Failed to add group:', err) }
+  }
+  
+  const handleAddGroupItem = async (groupTitle, groupSort) => {
+    if (!newGroupItem.trim()) return
+    try {
+      await addRuleToDb(newGroupItem.trim(), groupTitle, groupSort)
+      setNewGroupItem('')
+      setAddingToGroup(null)
+    } catch (err) { console.error('Failed to add group item:', err) }
+  }
+  
   const handleToggleRule = async (ruleId) => {
     try { await toggleRuleInDb(ruleId) } catch (err) { console.error('Failed to toggle rule:', err) }
   }
   
   const handleDeleteRule = async (ruleId) => {
     try { await deleteRuleFromDb(ruleId) } catch (err) { console.error('Failed to delete rule:', err) }
+  }
+  
+  const handleDeleteGroup = async (groupTitle) => {
+    try {
+      const groupRules = rules.filter(r => r.group_title === groupTitle)
+      for (const rule of groupRules) {
+        await deleteRuleFromDb(rule.id)
+      }
+    } catch (err) { console.error('Failed to delete group:', err) }
   }
   
   const handleApprove = async (proofId, options = {}) => {
@@ -257,6 +288,26 @@ function AdminRoomDetail() {
   const userEmail = room.assignedBy?.email || room.user?.email || ''
   const userAvatar = room.assignedBy?.avatar_url || room.user?.avatar_url
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase()
+  
+  // Group rules by group_title for structured display
+  const groupedRules = useMemo(() => {
+    const ungrouped = rules.filter(r => !r.group_title)
+    const groupMap = {}
+    rules.filter(r => r.group_title).forEach(r => {
+      if (!groupMap[r.group_title]) {
+        groupMap[r.group_title] = { title: r.group_title, groupSort: r.group_sort || 0, items: [] }
+      }
+      // Skip placeholder items (used to create the group)
+      if (r.text !== '(group placeholder)') {
+        groupMap[r.group_title].items.push(r)
+      } else {
+        // Keep track of the placeholder for deletion
+        groupMap[r.group_title].placeholderId = r.id
+      }
+    })
+    const groups = Object.values(groupMap).sort((a, b) => a.groupSort - b.groupSort)
+    return { ungrouped, groups }
+  }, [rules])
   
   const stats = {
     streak: room.stats?.streak || 0,
@@ -497,8 +548,8 @@ function AdminRoomDetail() {
               <Icon name="list" className="w-4 h-4 text-accent" />
             </div>
             <div className="flex-1">
-              <p className="text-white text-sm font-medium">{rules.filter(r => r.enabled).length} Active Rules</p>
-              <p className="text-gray-500 text-xs">{rules.length} total rules defined</p>
+              <p className="text-white text-sm font-medium">{rules.filter(r => r.enabled && r.text !== '(group placeholder)').length} Active Rules</p>
+              <p className="text-gray-500 text-xs">{groupedRules.groups.length} group{groupedRules.groups.length !== 1 ? 's' : ''}, {rules.filter(r => r.text !== '(group placeholder)').length} total items</p>
             </div>
             <button onClick={() => setActiveTab('rules')} className="text-accent text-xs hover:underline">Manage</button>
           </div>
@@ -574,51 +625,158 @@ function AdminRoomDetail() {
       
       {/* ========== RULES TAB ========== */}
       {activeTab === 'rules' && (
-        <div className="space-y-4">
-          {/* Rules List */}
-          <div className="space-y-2">
-            {rules.map(rule => (
-              <div 
-                key={rule.id}
-                className={`
-                  flex items-center gap-3 p-3 rounded-xl transition-all
-                  ${rule.enabled 
-                    ? 'bg-charcoal-500/20 border border-charcoal-400/10' 
-                    : 'bg-charcoal-700/10 border border-charcoal-600/5 opacity-60'}
-                `}
-              >
+        <div className="space-y-5">
+          
+          {/* Grouped Rules */}
+          {groupedRules.groups.map(group => (
+            <div key={group.title} className="rounded-xl border border-charcoal-400/15 bg-charcoal-500/10 overflow-hidden">
+              {/* Group Header */}
+              <div className="flex items-center justify-between px-4 py-3 bg-charcoal-500/30 border-b border-charcoal-400/10">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-accent" />
+                  <h3 className="text-white font-semibold text-sm">{group.title}</h3>
+                  <span className="text-gray-500 text-xs">({group.items.filter(i => i.enabled).length} active)</span>
+                </div>
                 <button
-                  onClick={() => handleToggleRule(rule.id)}
+                  onClick={() => handleDeleteGroup(group.title)}
+                  className="text-gray-600 hover:text-red-400 text-xs transition-colors"
+                >
+                  Remove group
+                </button>
+              </div>
+              
+              {/* Group Items */}
+              <div className="p-3 space-y-1.5">
+                {group.items.map(rule => (
+                  <div 
+                    key={rule.id}
+                    className={`
+                      flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all
+                      ${rule.enabled 
+                        ? 'bg-charcoal-500/20 border border-charcoal-400/5' 
+                        : 'bg-charcoal-700/10 border border-charcoal-600/5 opacity-50'}
+                    `}
+                  >
+                    <button
+                      onClick={() => handleToggleRule(rule.id)}
+                      className={`
+                        w-4.5 h-4.5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all
+                        ${rule.enabled ? 'bg-accent border-accent' : 'border-gray-600 hover:border-gray-500'}
+                      `}
+                    >
+                      {rule.enabled && <Icon name="check" className="w-2.5 h-2.5 text-charcoal-900" />}
+                    </button>
+                    <span className={`flex-1 text-sm ${rule.enabled ? 'text-gray-200' : 'text-gray-500'}`}>{rule.text}</span>
+                    <button
+                      onClick={() => handleDeleteRule(rule.id)}
+                      className="p-1 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors"
+                    >
+                      <Icon name="close" className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                
+                {group.items.length === 0 && (
+                  <p className="text-gray-600 text-xs py-2 px-3">No items yet. Add points below.</p>
+                )}
+                
+                {/* Add item to this group */}
+                {addingToGroup === group.title ? (
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="text"
+                      placeholder={`Add to "${group.title}"...`}
+                      value={newGroupItem}
+                      onChange={(e) => setNewGroupItem(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleAddGroupItem(group.title, group.groupSort)
+                        if (e.key === 'Escape') { setAddingToGroup(null); setNewGroupItem('') }
+                      }}
+                      autoFocus
+                      className="flex-1 px-3 py-2 rounded-lg bg-charcoal-500/30 border border-charcoal-400/10 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-accent/30"
+                    />
+                    <Button size="sm" onClick={() => handleAddGroupItem(group.title, group.groupSort)} disabled={!newGroupItem.trim()}>Add</Button>
+                    <button onClick={() => { setAddingToGroup(null); setNewGroupItem('') }} className="text-gray-500 hover:text-gray-300 text-xs px-2">Cancel</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setAddingToGroup(group.title); setNewGroupItem('') }}
+                    className="flex items-center gap-1.5 text-accent/70 hover:text-accent text-xs mt-1 px-3 py-1.5 transition-colors"
+                  >
+                    <Icon name="plus" className="w-3 h-3" />
+                    Add item
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          
+          {/* Ungrouped Rules (legacy / general rules) */}
+          {groupedRules.ungrouped.length > 0 && (
+            <div className="space-y-2">
+              {groupedRules.groups.length > 0 && (
+                <p className="text-gray-500 text-xs font-medium uppercase tracking-wider px-1">General Rules</p>
+              )}
+              {groupedRules.ungrouped.map(rule => (
+                <div 
+                  key={rule.id}
                   className={`
-                    w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all
-                    ${rule.enabled ? 'bg-accent border-accent' : 'border-gray-600 hover:border-gray-500'}
+                    flex items-center gap-3 p-3 rounded-xl transition-all
+                    ${rule.enabled 
+                      ? 'bg-charcoal-500/20 border border-charcoal-400/10' 
+                      : 'bg-charcoal-700/10 border border-charcoal-600/5 opacity-60'}
                   `}
                 >
-                  {rule.enabled && <Icon name="check" className="w-3 h-3 text-charcoal-900" />}
-                </button>
-                <span className={`flex-1 text-sm ${rule.enabled ? 'text-white' : 'text-gray-500'}`}>{rule.text}</span>
-                <button
-                  onClick={() => handleDeleteRule(rule.id)}
-                  className="p-1 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors"
-                >
-                  <Icon name="close" className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-            
-            {rules.length === 0 && (
-              <div className="text-center py-10">
-                <Icon name="list" className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                <p className="text-gray-500 text-xs">No rules yet. Add rules for {userName.split(' ')[0]} to follow.</p>
-              </div>
-            )}
+                  <button
+                    onClick={() => handleToggleRule(rule.id)}
+                    className={`
+                      w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all
+                      ${rule.enabled ? 'bg-accent border-accent' : 'border-gray-600 hover:border-gray-500'}
+                    `}
+                  >
+                    {rule.enabled && <Icon name="check" className="w-3 h-3 text-charcoal-900" />}
+                  </button>
+                  <span className={`flex-1 text-sm ${rule.enabled ? 'text-white' : 'text-gray-500'}`}>{rule.text}</span>
+                  <button
+                    onClick={() => handleDeleteRule(rule.id)}
+                    className="p-1 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors"
+                  >
+                    <Icon name="close" className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Empty State */}
+          {rules.length === 0 && (
+            <div className="text-center py-10">
+              <Icon name="list" className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+              <p className="text-gray-500 text-xs">No rules yet. Add a group or individual rule for {userName.split(' ')[0]} to follow.</p>
+            </div>
+          )}
+          
+          {/* Add New Group */}
+          <div className="p-4 rounded-xl border border-dashed border-charcoal-400/20 bg-charcoal-500/5">
+            <p className="text-gray-400 text-xs font-medium mb-2.5">Add Rule Group</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Group title (e.g., Chest Day, Leg Day)..."
+                value={newGroupTitle}
+                onChange={(e) => setNewGroupTitle(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddGroup()}
+                className="flex-1 px-3 py-2.5 rounded-xl bg-charcoal-500/20 border border-charcoal-400/10 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-accent/30"
+              />
+              <Button onClick={handleAddGroup} size="sm" disabled={!newGroupTitle.trim()}>Add Group</Button>
+            </div>
           </div>
           
-          {/* Add Rule */}
+          {/* Add ungrouped rule */}
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="Add a new rule..."
+              placeholder="Add a general rule (no group)..."
               value={newRule}
               onChange={(e) => setNewRule(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddRule()}

@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS room_rules (
   text TEXT NOT NULL,
   enabled BOOLEAN DEFAULT TRUE,
   sort_order INT DEFAULT 0,
+  group_title TEXT,
+  group_sort INT DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

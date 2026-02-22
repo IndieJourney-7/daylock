@@ -200,9 +200,9 @@ export const api = {
   // Rules
   rules: {
     getForRoom: (roomId) => request(`/api/rules/room/${roomId}`),
-    add: (roomId, text) => request('/api/rules', {
+    add: (roomId, text, groupTitle, groupSort) => request('/api/rules', {
       method: 'POST',
-      body: JSON.stringify({ room_id: roomId, text })
+      body: JSON.stringify({ room_id: roomId, text, group_title: groupTitle || null, group_sort: groupSort || 0 })
     }),
     update: (ruleId, data) => request(`/api/rules/${ruleId}`, {
       method: 'PUT',

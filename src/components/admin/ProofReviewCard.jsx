@@ -3,7 +3,7 @@
  * Phase 2: Admin Authority System
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, Badge, Icon, Button } from '../ui'
 import { QUALITY_LEVELS, getQualityLevel, FEEDBACK_TEMPLATES } from '../../lib/adminAuthority'
 
@@ -129,7 +129,21 @@ export default function ProofReviewCard({
     }
   }
 
-  const enabledRules = rules.filter(r => r.enabled)
+  const enabledRules = rules.filter(r => r.enabled && r.text !== '(group placeholder)')
+  
+  // Group enabled rules for structured checklist
+  const ruleGroups = useMemo(() => {
+    const ungrouped = enabledRules.filter(r => !r.group_title)
+    const groupMap = {}
+    enabledRules.filter(r => r.group_title).forEach(r => {
+      if (!groupMap[r.group_title]) {
+        groupMap[r.group_title] = { title: r.group_title, groupSort: r.group_sort || 0, items: [] }
+      }
+      groupMap[r.group_title].items.push(r)
+    })
+    const groups = Object.values(groupMap).sort((a, b) => a.groupSort - b.groupSort)
+    return { ungrouped, groups, hasGroups: groups.length > 0 }
+  }, [enabledRules])
 
   return (
     <div className="p-4 rounded-xl bg-charcoal-500/20 border border-yellow-500/15 space-y-4">
@@ -171,15 +185,38 @@ export default function ProofReviewCard({
       {enabledRules.length > 0 && (
         <div className="p-3 rounded-lg bg-charcoal-500/10 border border-charcoal-400/5">
           <p className="text-gray-400 text-[10px] uppercase tracking-wider mb-2">Check Against Rules</p>
-          <div className="space-y-1.5">
-            {enabledRules.map(rule => (
-              <div key={rule.id} className="flex items-start gap-2">
-                <div className="w-4 h-4 mt-0.5 rounded border border-gray-500/50 flex items-center justify-center flex-shrink-0">
-                  <Icon name="check" className="w-2.5 h-2.5 text-gray-600" />
+          <div className="space-y-3">
+            {/* Grouped rules */}
+            {ruleGroups.groups.map(group => (
+              <div key={group.title}>
+                <p className="text-gray-300 text-[11px] font-medium mb-1.5">{group.title}</p>
+                <div className="space-y-1.5 pl-2">
+                  {group.items.map(rule => (
+                    <div key={rule.id} className="flex items-start gap-2">
+                      <div className="w-4 h-4 mt-0.5 rounded border border-gray-500/50 flex items-center justify-center flex-shrink-0">
+                        <Icon name="check" className="w-2.5 h-2.5 text-gray-600" />
+                      </div>
+                      <span className="text-gray-400 text-xs leading-relaxed">{rule.text}</span>
+                    </div>
+                  ))}
                 </div>
-                <span className="text-gray-400 text-xs leading-relaxed">{rule.text}</span>
               </div>
             ))}
+            
+            {/* Ungrouped rules */}
+            {ruleGroups.ungrouped.length > 0 && (
+              <div className="space-y-1.5">
+                {ruleGroups.hasGroups && <p className="text-gray-500 text-[10px] uppercase tracking-wider">General</p>}
+                {ruleGroups.ungrouped.map(rule => (
+                  <div key={rule.id} className="flex items-start gap-2">
+                    <div className="w-4 h-4 mt-0.5 rounded border border-gray-500/50 flex items-center justify-center flex-shrink-0">
+                      <Icon name="check" className="w-2.5 h-2.5 text-gray-600" />
+                    </div>
+                    <span className="text-gray-400 text-xs leading-relaxed">{rule.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

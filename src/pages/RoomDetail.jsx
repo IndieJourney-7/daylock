@@ -181,6 +181,21 @@ function RoomDetail() {
   const timeWindow = roomsService.getTimeWindow(room)
   const rules = room.room_rules || []
   const admin = room.admin || null
+
+  // Group rules by group_title for structured display
+  const groupedRules = useMemo(() => {
+    const enabledRules = rules.filter(r => r.enabled && r.text !== '(group placeholder)')
+    const ungrouped = enabledRules.filter(r => !r.group_title)
+    const groupMap = {}
+    enabledRules.filter(r => r.group_title).forEach(r => {
+      if (!groupMap[r.group_title]) {
+        groupMap[r.group_title] = { title: r.group_title, groupSort: r.group_sort || 0, items: [] }
+      }
+      groupMap[r.group_title].items.push(r)
+    })
+    const groups = Object.values(groupMap).sort((a, b) => a.groupSort - b.groupSort)
+    return { ungrouped, groups, hasGroups: groups.length > 0 }
+  }, [rules])
   const inviteCode = room.pending_invite?.invite_code || room.room_invites?.find(i => i.status === 'accepted')?.invite_code || null
   
   // Build attendance map from attendanceData
@@ -405,17 +420,47 @@ function RoomDetail() {
           </div>
           <span className="text-xs text-gray-600 bg-charcoal-500/50 px-2 py-1 rounded">Read-only</span>
         </div>
-        {rules.length > 0 ? (
-          <ul className="space-y-3">
-            {rules.filter(r => r.enabled).map((rule, index) => (
-              <li key={rule.id || index} className="flex items-start gap-3">
-                <span className="w-5 h-5 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
-                  {index + 1}
-                </span>
-                <span className="text-gray-300 text-sm">{rule.text}</span>
-              </li>
+        {(groupedRules.groups.length > 0 || groupedRules.ungrouped.length > 0) ? (
+          <div className="space-y-5">
+            {/* Grouped rules */}
+            {groupedRules.groups.map(group => (
+              <div key={group.title}>
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                  <h3 className="text-white font-medium text-sm">{group.title}</h3>
+                </div>
+                <ul className="space-y-2 pl-4">
+                  {group.items.map((rule, idx) => (
+                    <li key={rule.id || idx} className="flex items-start gap-2.5">
+                      <span className="w-4 h-4 rounded-full bg-accent/15 text-accent flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">
+                        {idx + 1}
+                      </span>
+                      <span className="text-gray-300 text-sm">{rule.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+            
+            {/* Ungrouped rules */}
+            {groupedRules.ungrouped.length > 0 && (
+              <div>
+                {groupedRules.hasGroups && (
+                  <p className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2.5">General</p>
+                )}
+                <ul className="space-y-2">
+                  {groupedRules.ungrouped.map((rule, index) => (
+                    <li key={rule.id || index} className="flex items-start gap-3">
+                      <span className="w-5 h-5 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                        {index + 1}
+                      </span>
+                      <span className="text-gray-300 text-sm">{rule.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         ) : (
           <p className="text-gray-500 text-sm">No rules set yet</p>
         )}

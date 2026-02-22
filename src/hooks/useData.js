@@ -113,8 +113,8 @@ export function useRoomRules(roomId) {
     !!roomId
   )
 
-  const addRule = async (text) => {
-    const newRule = await rulesService.addRule(roomId, text)
+  const addRule = async (text, groupTitle, groupSort) => {
+    const newRule = await rulesService.addRule(roomId, text, groupTitle, groupSort)
     setData(prev => [...(prev || []), newRule])
     return newRule
   }
