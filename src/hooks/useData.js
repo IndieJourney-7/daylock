@@ -191,6 +191,7 @@ export function useRoomStats(roomId, userId) {
 
 /**
  * Fetch user history (all attendance across all rooms)
+ * Uses direct Supabase as primary, falls back to backend API
  */
 export function useUserHistory(userId, options = {}) {
   const [data, setData] = useState(null)
@@ -208,11 +209,30 @@ export function useUserHistory(userId, options = {}) {
     setError(null)
     
     try {
-      const result = await attendanceService.getAllUserAttendance(options)
-      setData(result)
+      // Try direct Supabase first (reliable on Vercel)
+      const { supabase } = await import('../lib/supabase')
+      let query = supabase
+        .from('attendance')
+        .select('id, room_id, date, status, note, submitted_at, proof_url, reviewed_at, rejection_reason')
+        .eq('user_id', userId)
+        .order('date', { ascending: false })
+
+      if (options.fromDate) query = query.gte('date', options.fromDate)
+      if (options.toDate) query = query.lte('date', options.toDate)
+      if (options.limit) query = query.limit(options.limit)
+
+      const { data: supaData, error: supaErr } = await query
+      if (supaErr) throw supaErr
+      setData(supaData || [])
     } catch (err) {
-      console.error('Failed to fetch user history:', err)
-      setError(err.message)
+      console.error('Failed to fetch user history from Supabase, trying API:', err)
+      try {
+        const result = await attendanceService.getAllUserAttendance(options)
+        setData(result)
+      } catch (apiErr) {
+        console.error('Failed to fetch user history:', apiErr)
+        setError(apiErr.message)
+      }
     } finally {
       setLoading(false)
     }
