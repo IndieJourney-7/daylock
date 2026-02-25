@@ -24,9 +24,36 @@ export const attendanceService = {
     
     // Upload proof image to Supabase Storage
     if (proofFile) {
+      // === FILE VALIDATION ===
+      const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+      const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/jpg']
+      const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'heic']
+      
+      // Validate file exists
+      if (!proofFile || !proofFile.size) {
+        throw new Error('Invalid file. Please select an image.')
+      }
+      
+      // Validate file size
+      if (proofFile.size > MAX_FILE_SIZE) {
+        throw new Error('File size must be less than 10MB')
+      }
+      
+      // Validate MIME type
+      if (!ALLOWED_MIME_TYPES.includes(proofFile.type)) {
+        throw new Error('Only image files (JPG, PNG, WebP, HEIC) are allowed')
+      }
+      
+      // Validate and sanitize file extension
+      const ext = proofFile.name?.split('.').pop()?.toLowerCase()
+      if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
+        throw new Error('Invalid file extension. Only JPG, PNG, WebP, and HEIC are allowed')
+      }
+      
+      // === END VALIDATION ===
+      
       const today = new Date().toISOString().split('T')[0]
-      const fileExt = proofFile.name?.split('.').pop() || 'jpg'
-      const fileName = `${userId}/${roomId}/${today}.${fileExt}`
+      const fileName = `${userId}/${roomId}/${today}.${ext}`
       
       console.log('Uploading proof to:', fileName)
       
